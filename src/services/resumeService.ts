@@ -41,28 +41,28 @@ export async function getUserProfile(): Promise<ProfileData | null> {
 }
 
 export async function createConversation() {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const userId = sessionData?.session?.user?.id;
+  const { data } = await supabase.auth.getSession();
+  const userId = data?.session?.user?.id;
   
   if (!userId) {
     throw new Error("User must be logged in to create a conversation");
   }
   
-  const { data, error } = await supabase
+  const result = await supabase
     .from('conversations')
     .insert([{ user_id: userId }])
     .select();
 
-  if (error) {
-    console.error("Error creating conversation:", error);
-    throw error;
+  if (result.error) {
+    console.error("Error creating conversation:", result.error);
+    throw result.error;
   }
 
-  return data[0];
+  return result.data[0];
 }
 
 export async function saveMessage(conversationId: string, message: MessageType) {
-  const { error } = await supabase
+  const result = await supabase
     .from('messages')
     .insert([{
       conversation_id: conversationId,
@@ -71,14 +71,14 @@ export async function saveMessage(conversationId: string, message: MessageType) 
       format: message.format || 'text'
     }]);
 
-  if (error) {
-    console.error("Error saving message:", error);
-    throw error;
+  if (result.error) {
+    console.error("Error saving message:", result.error);
+    throw result.error;
   }
 }
 
 export async function saveResume(userId: string, conversationId: string, content: string, jobTitle?: string, company?: string) {
-  const { error } = await supabase
+  const result = await supabase
     .from('resumes')
     .insert([{
       user_id: userId,
@@ -88,9 +88,9 @@ export async function saveResume(userId: string, conversationId: string, content
       company
     }]);
 
-  if (error) {
-    console.error("Error saving resume:", error);
-    throw error;
+  if (result.error) {
+    console.error("Error saving resume:", result.error);
+    throw result.error;
   }
 }
 
