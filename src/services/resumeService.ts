@@ -97,14 +97,19 @@ export async function saveResume(userId: string, conversationId: string, content
 export async function generateResumeWithAI(jobDescription: string): Promise<string> {
   const userProfile = await getUserProfile();
   
-  const { data, error } = await supabase.functions.invoke('generate-resume', {
-    body: { jobDescription, userProfile },
-  });
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-resume', {
+      body: { jobDescription, userProfile },
+    });
 
-  if (error) {
-    console.error("Error generating resume:", error);
-    throw error;
+    if (error) {
+      console.error("Error generating resume:", error);
+      throw error;
+    }
+
+    return data.resume;
+  } catch (error) {
+    console.error("Failed to generate resume:", error);
+    throw new Error("Failed to generate resume. Please try again later.");
   }
-
-  return data.resume;
 }

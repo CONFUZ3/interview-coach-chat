@@ -161,8 +161,8 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
           return;
         }
         
-        if (input.toLowerCase().includes("job description") || input.toLowerCase().includes("position")) {
-          // Generate resume using AI
+        // Generate resume using AI
+        try {
           const resumeContent = await generateResumeWithAI(input);
           
           // Remove typing indicator
@@ -184,21 +184,22 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
           if (session?.user) {
             await saveResume(session.user.id, conversationId, resumeContent);
           }
+        } catch (error) {
+          console.error("Error generating resume:", error);
           
-        } else {
-          // If not a job description, provide guidance
           // Remove typing indicator
           setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
           
-          const aiMessage: MessageType = {
+          // Add error message
+          const errorMessage: MessageType = {
             id: generateId(),
-            content: "To create a customized resume, please provide a job description. For example: 'I need a resume for a Senior Software Developer position at a tech startup.'",
+            content: "Sorry, I encountered an error while generating your resume. Please try again with more details about the job position.",
             type: "ai",
             timestamp: new Date()
           };
           
-          setMessages(prev => [...prev, aiMessage]);
-          await saveMessage(conversationId, aiMessage);
+          setMessages(prev => [...prev, errorMessage]);
+          await saveMessage(conversationId, errorMessage);
         }
       } else if (mode === "interview") {
         // Interview mode functionality remains the same for now
@@ -290,7 +291,7 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="chat-container p-4 flex-grow">
+      <div className="chat-container p-4 flex-grow overflow-auto">
         {messages.map((message) => (
           <ChatMessage 
             key={message.id} 
