@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ChatMessage from "./ChatMessage";
 import { useNavigate } from "react-router-dom";
+import { generateResumeWithAI, createConversation, saveMessage, saveResume, getUserProfile } from "@/services/resumeService";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export type MessageType = {
   id: string;
@@ -27,10 +30,20 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  // Fetch user session
+  const { data: session } = useQuery({
+    queryKey: ['session'],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      return data.session;
+    },
+  });
+
   // Check if user is authenticated
   useEffect(() => {
     const user = localStorage.getItem("careerAI-user");
@@ -38,6 +51,27 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
       navigate("/");
     }
   }, [navigate]);
+
+  // Create a new conversation when component mounts
+  useEffect(() => {
+    if (session?.user) {
+      async function initConversation() {
+        try {
+          const conversation = await createConversation();
+          setConversationId(conversation.id);
+        } catch (error) {
+          console.error("Failed to create conversation:", error);
+          toast({
+            title: "Error",
+            description: "Failed to initialize chat. Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
+      
+      initConversation();
+    }
+  }, [session, toast]);
 
   // Initial greeting message
   useEffect(() => {
@@ -52,7 +86,14 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     };
     
     setMessages([initialMessage]);
-  }, [mode]);
+    
+    // Save initial message to database if conversation exists
+    if (conversationId) {
+      saveMessage(conversationId, initialMessage).catch(error => {
+        console.error("Failed to save initial message:", error);
+      });
+    }
+  }, [mode, conversationId]);
 
   // Auto-scroll to the bottom of chat
   useEffect(() => {
@@ -64,7 +105,7 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
   const handleMessageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!input.trim()) return;
+    if (!input.trim() || !conversationId) return;
     
     // Add user message
     const userMessage: MessageType = {
@@ -78,6 +119,13 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     setInput("");
     setIsProcessing(true);
     
+    // Save user message to database
+    try {
+      await saveMessage(conversationId, userMessage);
+    } catch (error) {
+      console.error("Failed to save user message:", error);
+    }
+    
     // Add typing indicator
     const typingIndicatorId = generateId();
     setMessages(prev => [...prev, { 
@@ -89,45 +137,75 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     }]);
     
     try {
-      // Simulate API call to AI service
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Remove typing indicator
-      setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
-      
-      // Build response based on mode
-      let aiResponse = "";
-      let responseFormat: "text" | "resume" | "feedback" = "text";
-      
       if (mode === "resume") {
+        // Check if user has profile data
+        const profile = await getUserProfile();
+        if (!profile || !profile.fullName) {
+          // Remove typing indicator
+          setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
+          
+          const noProfileMessage: MessageType = {
+            id: generateId(),
+            content: "I notice that your profile information is incomplete. To create the best resume, please complete your profile first. Go to the Profile page to add your education, experience, and skills.",
+            type: "ai",
+            timestamp: new Date(),
+            category: "general"
+          };
+          
+          setMessages(prev => [...prev, noProfileMessage]);
+          await saveMessage(conversationId, noProfileMessage);
+          setIsProcessing(false);
+          return;
+        }
+        
         if (input.toLowerCase().includes("job description") || input.toLowerCase().includes("position")) {
-          aiResponse = `Based on the job description you provided, I've generated a customized resume that highlights your relevant skills and experience. Here's a preview:
-
-## PROFESSIONAL SUMMARY
-Dedicated professional with 5+ years of experience in software development and project management. Proven track record of delivering high-quality solutions while meeting tight deadlines. Expert in JavaScript, React, and Node.js with strong communication and leadership skills.
-
-## WORK EXPERIENCE
-**Senior Software Developer | ABC Tech | 2020-Present**
-- Led a team of 5 developers to deliver a customer-facing web application that increased user engagement by 40%
-- Implemented CI/CD pipelines that reduced deployment time by 60%
-- Mentored junior developers, contributing to 30% improvement in team productivity
-
-**Software Developer | XYZ Solutions | 2017-2020**
-- Developed and maintained multiple web applications using React, Node.js, and MongoDB
-- Collaborated with UX/UI designers to implement responsive designs that improved user experience
-- Reduced application load time by 45% through code optimization and implementing lazy loading
-
-## EDUCATION
-**Master of Computer Science | University of Technology | 2017**
-**Bachelor of Computer Science | State University | 2015**
-
-## SKILLS
-JavaScript, TypeScript, React, Node.js, Express, MongoDB, AWS, Docker, Git, Agile Methodologies`;
-          responseFormat = "resume";
+          // Generate resume using AI
+          const resumeContent = await generateResumeWithAI(input);
+          
+          // Remove typing indicator
+          setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
+          
+          // Add AI response with resume
+          const aiMessage: MessageType = {
+            id: generateId(),
+            content: resumeContent,
+            type: "ai",
+            timestamp: new Date(),
+            format: "resume"
+          };
+          
+          setMessages(prev => [...prev, aiMessage]);
+          await saveMessage(conversationId, aiMessage);
+          
+          // Save the generated resume to the database
+          if (session?.user) {
+            await saveResume(session.user.id, conversationId, resumeContent);
+          }
+          
         } else {
-          aiResponse = "To create a customized resume, please provide a job description. For example: 'I need a resume for a Senior Software Developer position at a tech startup.'";
+          // If not a job description, provide guidance
+          // Remove typing indicator
+          setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
+          
+          const aiMessage: MessageType = {
+            id: generateId(),
+            content: "To create a customized resume, please provide a job description. For example: 'I need a resume for a Senior Software Developer position at a tech startup.'",
+            type: "ai",
+            timestamp: new Date()
+          };
+          
+          setMessages(prev => [...prev, aiMessage]);
+          await saveMessage(conversationId, aiMessage);
         }
       } else if (mode === "interview") {
+        // Interview mode functionality remains the same for now
+        // Remove typing indicator
+        setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
+        
+        // Simulate AI response for interview mode
+        let aiResponse = "";
+        let responseFormat: "text" | "resume" | "feedback" = "text";
+        
         if (input.toLowerCase().includes("job description") || input.toLowerCase().includes("position")) {
           aiResponse = "Great! I'll be your interviewer for this mock interview session. Let's get started with the first question:\n\nCan you walk me through your background and how it relates to this position?";
         } else if (input.length > 50) {
@@ -136,31 +214,43 @@ JavaScript, TypeScript, React, Node.js, Express, MongoDB, AWS, Docker, Git, Agil
           aiResponse = "Could you elaborate a bit more? Providing detailed answers showcases your experience and communication skills to interviewers.";
           responseFormat = "feedback";
         }
+        
+        // Add AI response
+        const aiMessage: MessageType = {
+          id: generateId(),
+          content: aiResponse,
+          type: "ai",
+          timestamp: new Date(),
+          format: responseFormat
+        };
+        
+        setMessages(prev => [...prev, aiMessage]);
+        await saveMessage(conversationId, aiMessage);
       }
       
-      // Add AI response
-      const aiMessage: MessageType = {
-        id: generateId(),
-        content: aiResponse,
-        type: "ai",
-        timestamp: new Date(),
-        format: responseFormat
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
       setIsProcessing(false);
       
     } catch (error) {
+      console.error("Error processing message:", error);
+      
       // Remove typing indicator
       setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
       
       // Add error message
-      setMessages(prev => [...prev, {
+      const errorMessage: MessageType = {
         id: generateId(),
         content: "Sorry, I encountered an error. Please try again.",
         type: "ai",
         timestamp: new Date()
-      }]);
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      try {
+        await saveMessage(conversationId, errorMessage);
+      } catch (saveError) {
+        console.error("Failed to save error message:", saveError);
+      }
       
       toast({
         title: "Error",
@@ -217,13 +307,13 @@ JavaScript, TypeScript, React, Node.js, Express, MongoDB, AWS, Docker, Git, Agil
             placeholder={mode === "resume" 
               ? "Describe the job you're applying for..." 
               : "Type your interview response..."}
-            disabled={isProcessing}
+            disabled={isProcessing || !conversationId}
             className="flex-grow"
           />
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button type="submit" size="icon" disabled={isProcessing || !input.trim()}>
+                <Button type="submit" size="icon" disabled={isProcessing || !input.trim() || !conversationId}>
                   {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                 </Button>
               </TooltipTrigger>
