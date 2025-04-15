@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Send, FileText, Copy, DownloadCloud, Loader2 } from "lucide-react";
@@ -42,7 +41,7 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
 
   // Initial greeting message
   useEffect(() => {
-    const initialMessage = {
+    const initialMessage: MessageType = {
       id: generateId(),
       content: mode === "resume" 
         ? "Hello! I'm your AI resume builder. To generate a resume, please provide a job description and I'll create a customized resume based on your profile information."
