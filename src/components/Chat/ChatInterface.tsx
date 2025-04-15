@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Send, FileText, Copy, DownloadCloud, Loader2 } from "lucide-react";
@@ -58,7 +59,9 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
       async function initConversation() {
         try {
           const conversation = await createConversation();
-          setConversationId(conversation.id);
+          if (conversation && conversation.id) {
+            setConversationId(conversation.id);
+          }
         } catch (error) {
           console.error("Failed to create conversation:", error);
           toast({

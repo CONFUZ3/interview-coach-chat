@@ -41,9 +41,16 @@ export async function getUserProfile(): Promise<ProfileData | null> {
 }
 
 export async function createConversation() {
+  const { data: session } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
+  
+  if (!userId) {
+    throw new Error("User must be logged in to create a conversation");
+  }
+  
   const { data, error } = await supabase
     .from('conversations')
-    .insert([{ }])
+    .insert([{ user_id: userId }])
     .select();
 
   if (error) {
