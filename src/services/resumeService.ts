@@ -43,7 +43,7 @@ export async function getUserProfile(): Promise<ProfileData | null> {
 export async function createConversation() {
   const { data, error } = await supabase
     .from('conversations')
-    .insert([{}])
+    .insert([{ }])
     .select();
 
   if (error) {
