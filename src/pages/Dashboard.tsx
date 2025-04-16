@@ -1,7 +1,6 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, MessageSquare, User, ArrowRight } from "lucide-react";
+import { FileText, MessageSquare, User, ArrowRight, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/Layout/AppLayout";
@@ -15,7 +14,6 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Check if user is authenticated with Supabase
     const checkAuth = async () => {
       setIsLoading(true);
       const { data } = await supabase.auth.getSession();
@@ -25,12 +23,10 @@ const Dashboard = () => {
         return;
       }
 
-      // Set username from Supabase user data
       const user = data.session.user;
       const name = user.user_metadata?.name || user.email?.split('@')[0] || "User";
       setUserName(name);
       
-      // Check if profile exists
       const profile = await getUserProfile();
       setHasProfile(!!profile && !!profile.fullName);
       
