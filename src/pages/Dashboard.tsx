@@ -5,30 +5,39 @@ import { FileText, MessageSquare, User, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/Layout/AppLayout";
+import { supabase } from "@/integrations/supabase/client";
+import { getUserProfile } from "@/services/resumeService";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>("");
   const [hasProfile, setHasProfile] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Check if user is authenticated
-    const user = localStorage.getItem("careerAI-user");
-    if (!user) {
-      navigate("/");
-      return;
-    }
+    // Check if user is authenticated with Supabase
+    const checkAuth = async () => {
+      setIsLoading(true);
+      const { data } = await supabase.auth.getSession();
+      
+      if (!data.session) {
+        navigate("/");
+        return;
+      }
 
-    try {
-      const userData = JSON.parse(user);
-      setUserName(userData.name || "User");
-    } catch (error) {
-      console.error("Failed to parse user data", error);
-    }
-
-    // Check if profile exists
-    const profile = localStorage.getItem("careerAI-profile");
-    setHasProfile(!!profile);
+      // Set username from Supabase user data
+      const user = data.session.user;
+      const name = user.user_metadata?.name || user.email?.split('@')[0] || "User";
+      setUserName(name);
+      
+      // Check if profile exists
+      const profile = await getUserProfile();
+      setHasProfile(!!profile && !!profile.fullName);
+      
+      setIsLoading(false);
+    };
+    
+    checkAuth();
   }, [navigate]);
 
   const features = [
@@ -57,6 +66,21 @@ const Dashboard = () => {
       bgColor: "bg-emerald-100 dark:bg-emerald-900/20",
     },
   ];
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="container py-8 flex justify-center items-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="inline-block">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+            <p className="mt-2 text-muted-foreground">Loading your dashboard...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

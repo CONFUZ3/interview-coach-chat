@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
 export default function AuthForm() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -21,32 +23,61 @@ export default function AuthForm() {
     setIsLoading(true);
 
     try {
-      // This is where Firebase authentication would be integrated
-      // For now, we'll simulate a successful login/registration
-      
-      setTimeout(() => {
-        toast({
-          title: activeTab === "login" ? "Login successful" : "Registration successful",
-          description: activeTab === "login" 
-            ? "Welcome back to CareerAI Coach!" 
-            : "Your account has been created successfully.",
+      if (activeTab === "login") {
+        // Login with Supabase
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
         });
-        
-        // Simulate storing the user in local storage for now
-        localStorage.setItem("careerAI-user", JSON.stringify({ 
-          email, 
-          name: activeTab === "login" ? "User" : name 
+
+        if (error) throw error;
+
+        // Store user data in localStorage for backward compatibility
+        localStorage.setItem("careerAI-user", JSON.stringify({
+          email: data.user?.email,
+          name: data.user?.user_metadata?.name || "User",
         }));
-        
+
+        toast({
+          title: "Login successful",
+          description: "Welcome back to CareerAI Coach!",
+        });
+
         navigate("/dashboard");
-        setIsLoading(false);
-      }, 1500);
-    } catch (error) {
+      } else {
+        // Register with Supabase
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name,
+            },
+          },
+        });
+
+        if (error) throw error;
+
+        // Store user data in localStorage for backward compatibility
+        localStorage.setItem("careerAI-user", JSON.stringify({
+          email: data.user?.email,
+          name,
+        }));
+
+        toast({
+          title: "Registration successful",
+          description: "Your account has been created successfully.",
+        });
+
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
       toast({
         title: "Authentication failed",
-        description: "Please check your credentials and try again.",
+        description: error?.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -89,7 +120,7 @@ export default function AuthForm() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
+                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...</> : "Login"}
               </Button>
             </TabsContent>
             
@@ -125,7 +156,7 @@ export default function AuthForm() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Create account"}
+                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : "Create account"}
               </Button>
             </TabsContent>
           </form>

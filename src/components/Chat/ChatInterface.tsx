@@ -47,10 +47,14 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
 
   // Check if user is authenticated
   useEffect(() => {
-    const user = localStorage.getItem("careerAI-user");
-    if (!user) {
-      navigate("/");
-    }
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        navigate("/");
+      }
+    };
+    
+    checkAuth();
   }, [navigate]);
 
   // Create a new conversation when component mounts
@@ -202,7 +206,7 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
           await saveMessage(conversationId, errorMessage);
         }
       } else if (mode === "interview") {
-        // Interview mode functionality remains the same for now
+        // Interview mode functionality
         // Remove typing indicator
         setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
         

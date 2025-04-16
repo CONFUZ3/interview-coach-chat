@@ -1,18 +1,48 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuthForm from "@/components/Auth/AuthForm";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already authenticated
-    const user = localStorage.getItem("careerAI-user");
-    if (user) {
-      navigate("/dashboard");
-    }
+    // Check if user is already authenticated with Supabase
+    const checkAuth = async () => {
+      setIsLoading(true);
+      const { data } = await supabase.auth.getSession();
+      
+      if (data.session) {
+        navigate("/dashboard");
+      }
+      
+      setIsLoading(false);
+    };
+    
+    checkAuth();
+    
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        navigate("/dashboard");
+      }
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex justify-center items-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-lavender to-white dark:from-brand-darkBlue dark:to-background flex flex-col items-center justify-center p-4">
