@@ -73,6 +73,12 @@ Skills:
 ${skillsText}
 
 Please format the resume professionally with appropriate sections. Focus on highlighting the most relevant experience and skills for this specific job. The resume should be ATS-friendly and no longer than one page.
+
+Format each experience using the STAR format (Situation, Task, Action, Result) to make achievements measurable and impactful.
+
+For each work experience, provide 2-4 bullet points that highlight specific achievements rather than just job duties.
+
+Make sure the content is well-structured so it can be easily formatted into a PDF document.
 `;
 
     console.log("Calling Gemini API with prompt");

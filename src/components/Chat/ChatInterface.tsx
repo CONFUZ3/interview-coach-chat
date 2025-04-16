@@ -7,7 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ChatMessage from "./ChatMessage";
 import { useNavigate } from "react-router-dom";
-import { generateResumeWithAI, createConversation, saveMessage, saveResume, getUserProfile } from "@/services/resumeService";
+import { 
+  generateResumeWithAI, 
+  createConversation, 
+  saveMessage, 
+  saveResume, 
+  getUserProfile,
+  generatePDF
+} from "@/services/resumeService";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -32,6 +39,7 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [lastGeneratedResume, setLastGeneratedResume] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -90,7 +98,7 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     const initialMessage: MessageType = {
       id: generateId(),
       content: mode === "resume" 
-        ? "Hello! I'm your AI resume builder. To generate a resume, please provide a job description and I'll create a customized resume based on your profile information."
+        ? "Hello! I'm your AI resume builder. To generate a resume, please provide a job description and I'll create a customized resume based on your profile information. You can download your resume as a PDF file when it's ready."
         : "Hello! I'm your AI interview coach. To start a mock interview, please provide a job description and I'll simulate an interview for that position.",
       type: "ai",
       timestamp: new Date(),
@@ -176,6 +184,9 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
           
           // Remove typing indicator
           setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
+          
+          // Save the resume content for PDF generation
+          setLastGeneratedResume(resumeContent);
           
           // Add AI response with resume
           const aiMessage: MessageType = {
@@ -304,6 +315,42 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     });
   };
 
+  const downloadAsPDF = async () => {
+    if (!lastGeneratedResume) {
+      toast({
+        title: "No resume to download",
+        description: "Please generate a resume first before downloading as PDF.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const profile = await getUserProfile();
+      const pdfBlob = generatePDF(lastGeneratedResume, profile || undefined);
+      
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const element = document.createElement("a");
+      element.href = pdfUrl;
+      element.download = `resume_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      
+      toast({
+        title: "PDF download started",
+        description: "Your resume is being downloaded as a PDF file.",
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "PDF Generation Error",
+        description: "There was a problem generating your PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="chat-container p-4 flex-grow overflow-auto">
@@ -318,8 +365,20 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
         <div ref={messagesEndRef} />
       </div>
       
-      <form onSubmit={handleMessageSubmit} className="p-4 border-t">
-        <div className="flex gap-2">
+      <div className="p-4 border-t">
+        {lastGeneratedResume && mode === "resume" && (
+          <div className="mb-3 flex justify-end">
+            <Button
+              variant="outline"
+              className="ml-auto"
+              onClick={downloadAsPDF}
+            >
+              <DownloadCloud className="h-5 w-5 mr-1" /> Download as PDF
+            </Button>
+          </div>
+        )}
+        
+        <form onSubmit={handleMessageSubmit} className="flex gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -341,8 +400,8 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

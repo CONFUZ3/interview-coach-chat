@@ -2,7 +2,7 @@
 import AppLayout from "@/components/Layout/AppLayout";
 import ChatInterface from "@/components/Chat/ChatInterface";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
-import { ArrowDown, FileText, Info } from "lucide-react";
+import { ArrowDown, FileText, Info, Download } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const ResumePage = () => {
@@ -12,7 +12,7 @@ const ResumePage = () => {
         <div className="mb-4 md:mb-6">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">AI Resume Builder</h1>
           <p className="text-muted-foreground mt-1">
-            Chat with our AI to generate customized resumes based on job descriptions. First, ensure your profile information is complete, then provide a job description to get started.
+            Chat with our AI to generate customized PDF resumes based on job descriptions. First, ensure your profile information is complete, then provide a job description to get started.
           </p>
         </div>
         
@@ -22,7 +22,8 @@ const ResumePage = () => {
           <AlertDescription className="text-sm mt-1">
             1. First, complete your profile information from the dashboard.<br />
             2. Type a job description in the chat below.<br />
-            3. Our AI will generate a customized resume based on your profile and the job requirements.
+            3. Our AI will generate a customized resume based on your profile and the job requirements.<br />
+            4. You can download your resume as a PDF file with a single click.
           </AlertDescription>
         </Alert>
         
