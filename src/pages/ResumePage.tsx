@@ -12,7 +12,7 @@ const ResumePage = () => {
         <div className="mb-4 md:mb-6">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">AI Resume Builder</h1>
           <p className="text-muted-foreground mt-1">
-            Chat with our AI to generate customized PDF resumes based on job descriptions. First, ensure your profile information is complete, then provide a job description to get started.
+            Chat with our AI to generate customized PDF resumes tailored to specific job descriptions. First, ensure your profile information is complete, then provide a job description to get started.
           </p>
         </div>
         
@@ -20,18 +20,24 @@ const ResumePage = () => {
           <Info className="h-4 w-4 text-blue-500" />
           <AlertTitle>How to use the resume builder</AlertTitle>
           <AlertDescription className="text-sm mt-1">
-            1. First, complete your profile information from the dashboard.<br />
+            1. Complete your profile information from the dashboard first.<br />
             2. Type a job description in the chat below.<br />
-            3. Our AI will generate a customized resume based on your profile and the job requirements.<br />
-            4. You can download your resume as a PDF file with a single click.
+            3. Our AI will analyze your profile and the job requirements to create a tailored resume.<br />
+            4. Download your professional resume as a formatted PDF file with a single click.
           </AlertDescription>
         </Alert>
         
         <Card className="mb-4 bg-accent/50">
           <CardContent className="pt-6 pb-4">
-            <CardDescription className="flex items-center gap-2">
-              <ArrowDown className="h-4 w-4 animate-bounce" />
-              Type a job description in the chat below to generate a tailored resume
+            <CardDescription className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <div className="flex items-center">
+                <ArrowDown className="h-4 w-4 animate-bounce mr-2" />
+                <span>Type a job description in the chat below</span>
+              </div>
+              <div className="flex items-center mt-2 sm:mt-0 sm:ml-auto">
+                <Download className="h-4 w-4 mr-2" />
+                <span>Download a professionally formatted PDF resume</span>
+              </div>
             </CardDescription>
           </CardContent>
         </Card>

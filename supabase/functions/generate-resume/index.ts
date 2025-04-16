@@ -55,14 +55,17 @@ serve(async (req) => {
       ? skills.join(", ")
       : "No skills provided";
 
-    // Construct prompt for Gemini
+    // Improved prompt for Gemini with clearer structure and LaTeX-like formatting
     const prompt = `
-Generate a professional resume for ${fullName} (${email}, ${phone}) applying for the following job:
+You are an expert resume writer. Create a professional, ATS-optimized resume for ${fullName} who is applying for this job:
 
 JOB DESCRIPTION:
 ${jobDescription}
 
 CANDIDATE INFORMATION:
+Name: ${fullName}
+Contact: ${email} | ${phone}
+
 Education:
 ${educationText}
 
@@ -72,13 +75,16 @@ ${experienceText}
 Skills:
 ${skillsText}
 
-Please format the resume professionally with appropriate sections. Focus on highlighting the most relevant experience and skills for this specific job. The resume should be ATS-friendly and no longer than one page.
+Format requirements:
+1. Create a clear, concise, professional resume that's optimized for ATS systems
+2. Focus only on relevant experience and skills that match the job description
+3. Use the STAR format (Situation, Task, Action, Result) for achievements
+4. For each experience, provide 2-4 bullet points with quantifiable achievements
+5. Organize the resume in clear sections with proper formatting
+6. Make every word count - the resume should be concise and impactful
+7. Include a professional summary at the top that matches the candidate's experience with the job requirements
 
-Format each experience using the STAR format (Situation, Task, Action, Result) to make achievements measurable and impactful.
-
-For each work experience, provide 2-4 bullet points that highlight specific achievements rather than just job duties.
-
-Make sure the content is well-structured so it can be easily formatted into a PDF document.
+Return ONLY the formatted resume content with proper section headers (EDUCATION, EXPERIENCE, SKILLS, etc.). The content will be used to generate a PDF, so ensure proper formatting with clear section breaks.
 `;
 
     console.log("Calling Gemini API with prompt");
@@ -121,9 +127,12 @@ Make sure the content is well-structured so it can be easily formatted into a PD
 
     console.log("Resume generated successfully");
     
-    // Return the generated resume
+    // Return the generated resume with profile data for integrated PDF creation
     return new Response(
-      JSON.stringify({ resume: resumeText }),
+      JSON.stringify({ 
+        resume: resumeText,
+        profile: userProfile  // Include profile data in the response
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
     

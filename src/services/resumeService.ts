@@ -96,7 +96,7 @@ export async function saveResume(userId: string, conversationId: string, content
   }
 }
 
-export async function generateResumeWithAI(jobDescription: string): Promise<string> {
+export async function generateResumeWithAI(jobDescription: string): Promise<{ resumeText: string, profileData: ProfileData }> {
   const userProfile = await getUserProfile();
   
   if (!userProfile) {
@@ -117,140 +117,141 @@ export async function generateResumeWithAI(jobDescription: string): Promise<stri
       throw new Error("Invalid response format from resume generation");
     }
 
-    return data.resume;
+    return {
+      resumeText: data.resume,
+      profileData: userProfile
+    };
   } catch (error) {
     console.error("Failed to generate resume:", error);
     throw new Error("Failed to generate resume. Please try again later.");
   }
 }
 
-export function generatePDF(resumeContent: string, profileData?: ProfileData): Blob {
+export function generatePDF(resumeContent: string, profileData: ProfileData): Blob {
   const doc = new jsPDF();
-  const profile = profileData || {
-    fullName: "Name not provided",
-    email: "Email not provided",
-    phone: "Phone not provided",
-    education: [],
-    experience: [],
-    skills: []
-  };
   
-  // Set font size and add title
-  doc.setFontSize(24);
-  doc.text(profile.fullName, 105, 20, { align: 'center' });
+  // Set up document
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(profileData.fullName, 105, 20, { align: 'center' });
   
   // Contact information
   doc.setFontSize(10);
-  doc.text(`${profile.email} | ${profile.phone}`, 105, 30, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${profileData.email} | ${profileData.phone}`, 105, 28, { align: 'center' });
   
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text("EDUCATION", 20, 45);
-  doc.line(20, 47, 190, 47);
+  // Add horizontal line
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.5);
+  doc.line(20, 32, 190, 32);
   
-  let yPos = 55;
+  // Parse and format the AI-generated resume
+  const sections = parseResumeContent(resumeContent);
+  let yPos = 40;
   
-  // Add education details
-  if (profile.education && profile.education.length > 0) {
-    profile.education.forEach(edu => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(edu.institution, 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(edu.graduationDate, 170, yPos, { align: 'right' });
-      yPos += 6;
-      doc.text(edu.degree, 20, yPos);
-      yPos += 10;
-    });
-  } else {
+  // Render each section of the resume
+  for (const section of sections) {
+    // Section header
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(section.title, 20, yPos);
+    yPos += 4;
+    
+    // Underline the section header
+    doc.line(20, yPos, 190, yPos);
+    yPos += 8;
+    
+    // Section content
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text("No education information provided", 20, yPos);
-    yPos += 10;
-  }
-  
-  // Add experience section
-  doc.setFont('helvetica', 'bold');
-  doc.text("EXPERIENCE", 20, yPos);
-  doc.line(20, yPos + 2, 190, yPos + 2);
-  yPos += 10;
-  
-  // Add work experience
-  if (profile.experience && profile.experience.length > 0) {
-    profile.experience.forEach(exp => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(exp.company, 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${exp.startDate} - ${exp.endDate}`, 170, yPos, { align: 'right' });
-      yPos += 6;
-      doc.setFont('helvetica', 'italic');
-      doc.text(exp.position, 20, yPos);
-      yPos += 6;
-      
-      // Format the description with proper text wrapping
-      const descriptionLines = doc.splitTextToSize(exp.description, 170);
-      doc.setFont('helvetica', 'normal');
-      
-      descriptionLines.forEach(line => {
+    
+    if (section.content.length > 0) {
+      for (const line of section.content) {
+        // Check if we need a new page
         if (yPos > 270) {
           doc.addPage();
           yPos = 20;
         }
-        doc.text(line, 20, yPos);
-        yPos += 6;
-      });
-      
-      yPos += 5;
-    });
-  } else {
-    doc.setFont('helvetica', 'normal');
-    doc.text("No work experience provided", 20, yPos);
-    yPos += 10;
-  }
-  
-  // Add skills section
-  if (yPos > 250) {
-    doc.addPage();
-    yPos = 20;
-  }
-  
-  doc.setFont('helvetica', 'bold');
-  doc.text("SKILLS", 20, yPos);
-  doc.line(20, yPos + 2, 190, yPos + 2);
-  yPos += 10;
-  
-  // Add skills
-  if (profile.skills && profile.skills.length > 0) {
-    doc.setFont('helvetica', 'normal');
-    const skillsText = profile.skills.join(", ");
-    const skillsLines = doc.splitTextToSize(skillsText, 170);
-    
-    skillsLines.forEach(line => {
-      doc.text(line, 20, yPos);
-      yPos += 6;
-    });
-  } else {
-    doc.setFont('helvetica', 'normal');
-    doc.text("No skills provided", 20, yPos);
-  }
-  
-  // Add the resume content as an additional page
-  if (resumeContent) {
-    doc.addPage();
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    
-    const contentLines = doc.splitTextToSize(resumeContent, 170);
-    let contentYPos = 20;
-    
-    contentLines.forEach(line => {
-      if (contentYPos > 270) {
-        doc.addPage();
-        contentYPos = 20;
+        
+        if (line.startsWith('* ')) {
+          // This is a bullet point
+          const bulletText = line.substring(2);
+          const textLines = doc.splitTextToSize(bulletText, 165);
+          
+          doc.text('•', 22, yPos);
+          doc.text(textLines, 26, yPos);
+          yPos += 5 * textLines.length;
+        } else if (line.startsWith('**')) {
+          // This is a subheader (bold text)
+          const boldText = line.replace(/\*\*/g, '');
+          doc.setFont('helvetica', 'bold');
+          doc.text(boldText, 20, yPos);
+          doc.setFont('helvetica', 'normal');
+          yPos += 5;
+        } else {
+          // Regular text
+          const textLines = doc.splitTextToSize(line, 170);
+          doc.text(textLines, 20, yPos);
+          yPos += 5 * textLines.length;
+        }
+        
+        // Add a small space between lines
+        yPos += 1;
       }
-      doc.text(line, 20, contentYPos);
-      contentYPos += 5;
-    });
+    } else {
+      doc.text("No information provided", 20, yPos);
+      yPos += 5;
+    }
+    
+    // Add space between sections
+    yPos += 5;
   }
   
   return doc.output('blob');
 }
 
+// Helper function to parse the resume content into sections
+function parseResumeContent(content: string): Array<{title: string, content: string[]}> {
+  const sections: Array<{title: string, content: string[]}> = [];
+  const lines = content.split('\n').filter(line => line.trim() !== '');
+  
+  let currentSection: {title: string, content: string[]} | null = null;
+  
+  for (const line of lines) {
+    // Check if this is a section header (all caps or has a colon at the end)
+    if (line.toUpperCase() === line && line.trim().length > 0 || 
+        /^#+ /.test(line) || 
+        /^[A-Z][A-Za-z\s]+:$/.test(line)) {
+      
+      // Save the previous section if it exists
+      if (currentSection) {
+        sections.push(currentSection);
+      }
+      
+      // Create a new section
+      const title = line.replace(/^#+\s+/, '').replace(/:$/, '');
+      currentSection = { title, content: [] };
+    } 
+    // If not a section header and we have a current section, add to content
+    else if (currentSection) {
+      currentSection.content.push(line);
+    }
+    // If we haven't found a section header yet, create a default one
+    else {
+      currentSection = { title: "SUMMARY", content: [line] };
+    }
+  }
+  
+  // Add the last section
+  if (currentSection) {
+    sections.push(currentSection);
+  }
+  
+  return sections;
+}
+
+// Helper function to convert markdown bullet points to proper bullet points
+function processMarkdownContent(content: string): string {
+  // Replace markdown bullet points with Unicode bullets
+  return content.replace(/^\s*-\s+/gm, '• ');
+}

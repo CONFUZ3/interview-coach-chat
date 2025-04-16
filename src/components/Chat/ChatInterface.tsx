@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Send, FileText, Copy, DownloadCloud, Loader2 } from "lucide-react";
@@ -44,7 +43,6 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Fetch user session
   const { data: session } = useQuery({
     queryKey: ['session'],
     queryFn: async () => {
@@ -53,7 +51,6 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     },
   });
 
-  // Check if user is authenticated
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
@@ -70,7 +67,6 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     checkAuth();
   }, [navigate, toast]);
 
-  // Create a new conversation when component mounts
   useEffect(() => {
     if (session?.user) {
       async function initConversation() {
@@ -93,7 +89,6 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     }
   }, [session, toast]);
 
-  // Initial greeting message
   useEffect(() => {
     const initialMessage: MessageType = {
       id: generateId(),
@@ -107,7 +102,6 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     
     setMessages([initialMessage]);
     
-    // Save initial message to database if conversation exists
     if (conversationId) {
       saveMessage(conversationId, initialMessage).catch(error => {
         console.error("Failed to save initial message:", error);
@@ -115,7 +109,6 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     }
   }, [mode, conversationId]);
 
-  // Auto-scroll to the bottom of chat
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -127,7 +120,6 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     
     if (!input.trim() || !conversationId) return;
     
-    // Add user message
     const userMessage: MessageType = {
       id: generateId(),
       content: input,
@@ -139,14 +131,12 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     setInput("");
     setIsProcessing(true);
     
-    // Save user message to database
     try {
       await saveMessage(conversationId, userMessage);
     } catch (error) {
       console.error("Failed to save user message:", error);
     }
     
-    // Add typing indicator
     const typingIndicatorId = generateId();
     setMessages(prev => [...prev, { 
       id: typingIndicatorId, 
@@ -158,10 +148,8 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     
     try {
       if (mode === "resume") {
-        // Check if user has profile data
         const profile = await getUserProfile();
         if (!profile || !profile.fullName) {
-          // Remove typing indicator
           setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
           
           const noProfileMessage: MessageType = {
@@ -178,61 +166,29 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
           return;
         }
         
-        // Generate resume using AI
-        try {
-          const resumeContent = await generateResumeWithAI(input);
-          
-          // Remove typing indicator
-          setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
-          
-          // Save the resume content for PDF generation
-          setLastGeneratedResume(resumeContent);
-          
-          // Add AI response with resume
-          const aiMessage: MessageType = {
-            id: generateId(),
-            content: resumeContent,
-            type: "ai",
-            timestamp: new Date(),
-            format: "resume"
-          };
-          
-          setMessages(prev => [...prev, aiMessage]);
-          await saveMessage(conversationId, aiMessage);
-          
-          // Save the generated resume to the database
-          if (session?.user) {
-            await saveResume(session.user.id, conversationId, resumeContent);
-          }
-        } catch (error) {
-          console.error("Error generating resume:", error);
-          
-          // Remove typing indicator
-          setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
-          
-          // Add error message
-          const errorMessage: MessageType = {
-            id: generateId(),
-            content: "Sorry, I encountered an error while generating your resume. Please try again with more details about the job position or check if your profile information is complete.",
-            type: "ai",
-            timestamp: new Date()
-          };
-          
-          setMessages(prev => [...prev, errorMessage]);
-          await saveMessage(conversationId, errorMessage);
-          
-          toast({
-            title: "Resume Generation Error",
-            description: "There was a problem generating your resume. Please try again.",
-            variant: "destructive",
-          });
+        const result = await generateResumeWithAI(input);
+        const resumeContent = result.resumeText;
+        
+        setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
+        setLastGeneratedResume(resumeContent);
+        
+        const aiMessage: MessageType = {
+          id: generateId(),
+          content: resumeContent,
+          type: "ai",
+          timestamp: new Date(),
+          format: "resume"
+        };
+        
+        setMessages(prev => [...prev, aiMessage]);
+        await saveMessage(conversationId, aiMessage);
+        
+        if (session?.user) {
+          await saveResume(session.user.id, conversationId, resumeContent);
         }
       } else if (mode === "interview") {
-        // Interview mode functionality
-        // Remove typing indicator
         setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
         
-        // Simulate AI response for interview mode
         let aiResponse = "";
         let responseFormat: "text" | "resume" | "feedback" = "text";
         
@@ -245,7 +201,6 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
           responseFormat = "feedback";
         }
         
-        // Add AI response
         const aiMessage: MessageType = {
           id: generateId(),
           content: aiResponse,
@@ -259,14 +214,11 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
       }
       
       setIsProcessing(false);
-      
     } catch (error) {
       console.error("Error processing message:", error);
       
-      // Remove typing indicator
       setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
       
-      // Add error message
       const errorMessage: MessageType = {
         id: generateId(),
         content: "Sorry, I encountered an error. Please try again.",
@@ -327,19 +279,28 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     
     try {
       const profile = await getUserProfile();
-      const pdfBlob = generatePDF(lastGeneratedResume, profile || undefined);
+      if (!profile) {
+        toast({
+          title: "Profile information missing",
+          description: "Please complete your profile information before downloading a PDF.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const pdfBlob = generatePDF(lastGeneratedResume, profile);
       
       const pdfUrl = URL.createObjectURL(pdfBlob);
       const element = document.createElement("a");
       element.href = pdfUrl;
-      element.download = `resume_${new Date().toISOString().split('T')[0]}.pdf`;
+      element.download = `${profile.fullName.replace(/\s+/g, '_')}_resume_${new Date().toISOString().split('T')[0]}.pdf`;
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
       
       toast({
         title: "PDF download started",
-        description: "Your resume is being downloaded as a PDF file.",
+        description: "Your customized resume is being downloaded as a PDF file.",
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
