@@ -97,6 +97,10 @@ export async function saveResume(userId: string, conversationId: string, content
 export async function generateResumeWithAI(jobDescription: string): Promise<string> {
   const userProfile = await getUserProfile();
   
+  if (!userProfile) {
+    throw new Error("User profile is required to generate a resume");
+  }
+  
   try {
     const { data, error } = await supabase.functions.invoke('generate-resume', {
       body: { jobDescription, userProfile },
@@ -105,6 +109,10 @@ export async function generateResumeWithAI(jobDescription: string): Promise<stri
     if (error) {
       console.error("Error generating resume:", error);
       throw error;
+    }
+
+    if (!data || !data.resume) {
+      throw new Error("Invalid response format from resume generation");
     }
 
     return data.resume;

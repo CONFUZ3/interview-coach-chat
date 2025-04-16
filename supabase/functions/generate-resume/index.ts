@@ -75,9 +75,10 @@ ${skillsText}
 Please format the resume professionally with appropriate sections. Focus on highlighting the most relevant experience and skills for this specific job. The resume should be ATS-friendly and no longer than one page.
 `;
 
-    // Call Gemini API
     console.log("Calling Gemini API with prompt");
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+    
+    // Updated Gemini API endpoint and request format
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -103,11 +104,12 @@ Please format the resume professionally with appropriate sections. Focus on high
 
     const data = await response.json();
     
-    // Extract resume text from Gemini response
+    // Extract resume text from Gemini response (updated format)
     let resumeText = "";
     if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
       resumeText = data.candidates[0].content.parts[0].text;
     } else {
+      console.error("Unexpected response format:", JSON.stringify(data));
       throw new Error("Unexpected response format from Gemini API");
     }
 

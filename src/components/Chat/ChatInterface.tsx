@@ -51,11 +51,16 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
         navigate("/");
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to use this feature.",
+          variant: "destructive",
+        });
       }
     };
     
     checkAuth();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   // Create a new conversation when component mounts
   useEffect(() => {
@@ -197,13 +202,19 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
           // Add error message
           const errorMessage: MessageType = {
             id: generateId(),
-            content: "Sorry, I encountered an error while generating your resume. Please try again with more details about the job position.",
+            content: "Sorry, I encountered an error while generating your resume. Please try again with more details about the job position or check if your profile information is complete.",
             type: "ai",
             timestamp: new Date()
           };
           
           setMessages(prev => [...prev, errorMessage]);
           await saveMessage(conversationId, errorMessage);
+          
+          toast({
+            title: "Resume Generation Error",
+            description: "There was a problem generating your resume. Please try again.",
+            variant: "destructive",
+          });
         }
       } else if (mode === "interview") {
         // Interview mode functionality
