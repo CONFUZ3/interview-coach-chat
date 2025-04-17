@@ -64,6 +64,86 @@ serve(async (req) => {
       ? skills.join(", ")
       : "No skills provided";
 
+    // LaTeX template for article class (ATS-friendly)
+    const latexTemplate = `
+\\documentclass[a4paper,12pt]{article}
+
+\\usepackage{latexsym}
+\\usepackage[empty]{fullpage}
+\\usepackage{titlesec}
+\\usepackage{marvosym}
+\\usepackage[usenames,dvipsnames]{color}
+\\usepackage{verbatim}
+\\usepackage{enumitem}
+\\usepackage[hidelinks]{hyperref}
+\\usepackage{fancyhdr}
+\\usepackage[english]{babel}
+\\usepackage{tabularx}
+
+\\pagestyle{fancy}
+\\fancyhf{} % clear all header and footer fields
+\\fancyfoot{}
+\\renewcommand{\\headrulewidth}{0pt}
+\\renewcommand{\\footrulewidth}{0pt}
+
+% Adjust margins
+\\addtolength{\\oddsidemargin}{-0.5in}
+\\addtolength{\\evensidemargin}{-0.5in}
+\\addtolength{\\textwidth}{1in}
+\\addtolength{\\topmargin}{-.5in}
+\\addtolength{\\textheight}{1.0in}
+
+\\urlstyle{same}
+
+\\raggedbottom
+\\raggedright
+\\setlength{\\tabcolsep}{0in}
+
+% Sections formatting
+\\titleformat{\\section}{
+  \\vspace{-4pt}\\scshape\\raggedright\\large
+}{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]
+
+%-------------------------
+% Custom commands
+\\newcommand{\\resumeItem}[1]{
+  \\item\\small{
+    {#1 \\vspace{-2pt}}
+  }
+}
+
+\\newcommand{\\resumeSubheading}[4]{
+  \\vspace{-2pt}\\item
+    \\begin{tabular*}{0.97\\textwidth}[t]{l@{\\extracolsep{\\fill}}r}
+      \\textbf{#1} & #2 \\\\
+      \\textit{\\small#3} & \\textit{\\small #4} \\\\
+    \\end{tabular*}\\vspace{-7pt}
+}
+
+\\newcommand{\\resumeSubSubheading}[2]{
+    \\item
+    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
+      \\textit{\\small#1} & \\textit{\\small #2} \\\\
+    \\end{tabular*}\\vspace{-7pt}
+}
+
+\\newcommand{\\resumeProjectHeading}[2]{
+    \\item
+    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
+      \\small#1 & #2 \\\\
+    \\end{tabular*}\\vspace{-7pt}
+}
+
+\\newcommand{\\resumeSubItem}[1]{\\resumeItem{#1}\\vspace{-4pt}}
+
+\\renewcommand\\labelitemii{$\\vcenter{\\hbox{\\tiny$\\bullet$}}$}
+
+\\newcommand{\\resumeSubHeadingListStart}{\\begin{itemize}[leftmargin=0.15in, label={}]}
+\\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}
+\\newcommand{\\resumeItemListStart}{\\begin{itemize}}
+\\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
+`;
+
     // Improved LaTeX-focused prompt for Gemini based on the Python template
     const prompt = `
 You are an expert LaTeX formatter specializing in professional resumes. Your job is to transform the provided 
@@ -73,7 +153,8 @@ personal information and job description into a structured, well-formatted LaTeX
 1. Output must be 100% valid LaTeX code. No explanations, comments, or additional text.
 2. Ensure correct syntax and escaping. Escape any LaTeX special characters in user data.
 3. The output must be directly compilable.
-4. Use the moderncv package with classic style for formatting.
+4. Use the article class with the resumeItem and resumeSubheading commands provided in the template.
+5. Do NOT use the moderncv package. Instead use the provided template with article class.
 
 ### Resume Bullet Points:
 • Each bullet point must reflect a specific achievement or contribution.
@@ -81,13 +162,8 @@ personal information and job description into a structured, well-formatted LaTeX
 • Use strong action verbs and quantify results where possible (e.g., 'Boosted efficiency by 30%').
 • NEVER mention "STAR technique" anywhere in the output.
 
-### Good Examples of Bullet Points:
-- "Led a team of 5 engineers to develop a machine learning model, reducing data processing time by 40%."
-- "Revamped customer support system, decreasing resolution time from 48 to 12 hours."
-
-### Bad Examples to Avoid:
-- "Worked on various machine learning projects."
-- "Helped improve company performance."
+### TEMPLATE TO USE:
+${latexTemplate}
 
 ### CANDIDATE INFORMATION:
 Name: ${fullName}
@@ -107,8 +183,17 @@ ${jobDescription}
 
 ${previousResume ? `### PREVIOUS RESUME CONTENT (use this as reference):\n${previousResume}` : ''}
 
-Create a complete, compilable LaTeX document using the moderncv package that contains only LaTeX code.
-Return ONLY valid LaTeX code starting with \\documentclass and ending with \\end{document}.
+Create a complete, compilable LaTeX document using the provided template above. The document should start with the template, include a proper \\begin{document} after the template, and end with \\end{document}.
+Return ONLY valid LaTeX code.
+
+The basic structure of the resume should be:
+1. Name and contact at the top (centered)
+2. Professional summary or objective
+3. Work experience section with bullet points
+4. Education section
+5. Skills section
+
+For the experience section, use the \\resumeSubHeadingListStart, \\resumeSubheading, and \\resumeItemListStart commands properly.
 `;
 
     console.log("Calling Gemini API with prompt");
@@ -149,6 +234,12 @@ Return ONLY valid LaTeX code starting with \\documentclass and ending with \\end
       latexContent = latexContent.replace(/\*\*/g, ''); // Remove markdown bold
       latexContent = latexContent.replace(/\*/g, '');   // Remove markdown italic
       latexContent = latexContent.replace(/STAR technique/gi, ''); // Remove any STAR mentions
+      latexContent = latexContent.replace(/Using the STAR format/gi, ''); // Additional STAR mention cleanup
+      latexContent = latexContent.replace(/Situation, Task, Action, Result/gi, '');
+      latexContent = latexContent.replace(/Situation:/gi, '');
+      latexContent = latexContent.replace(/Task:/gi, '');
+      latexContent = latexContent.replace(/Action:/gi, '');
+      latexContent = latexContent.replace(/Result:/gi, '');
       
       // If the response doesn't start with \documentclass, extract only the LaTeX portion
       if (!latexContent.trim().startsWith("\\documentclass")) {

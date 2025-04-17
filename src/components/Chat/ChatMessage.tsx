@@ -202,9 +202,21 @@ function extractResumePreviewFromLatex(latexCode: string): string {
       return;
     }
     
+    // Detect resumeSubheading (for article template)
+    if (line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
+      const match = line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
+      if (match) {
+        const [_, title, date, organization, location] = match;
+        sections.push(`### ${title} at ${organization}`);
+        sections.push(`${date} | ${location}`);
+      }
+      return;
+    }
+    
     // Detect items
-    if (line.match(/\\item\s/)) {
+    if (line.match(/\\item\s|\\resumeItem\{/)) {
       const itemText = line.replace(/\\item\s+/, "")
+                          .replace(/\\resumeItem\{([^}]+)\}/, "$1")
                           .replace(/\\textbf\{([^}]+)\}/g, "**$1**")
                           .replace(/\\textit\{([^}]+)\}/g, "*$1*")
                           .trim();

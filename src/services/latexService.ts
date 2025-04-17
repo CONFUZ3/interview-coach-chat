@@ -158,6 +158,12 @@ function parseLatexContent(latexCode: string): {
     const cvNameMatch = latexCode.match(/\\name\{([^}]+)\}/);
     if (cvNameMatch) {
       result.name = cvNameMatch[1];
+    } else {
+      // Standard article class format
+      const articleNameMatch = latexCode.match(/\\textbf\{\\Huge\\s*\\scshape\s*([^}]+)\s*\}/);
+      if (articleNameMatch) {
+        result.name = articleNameMatch[1];
+      }
     }
   }
   
@@ -184,7 +190,7 @@ function parseLatexContent(latexCode: string): {
         const items: string[] = [];
         
         // Look for items
-        const itemMatches = content.match(/\\item[^\\]*(?:\\[^item][^\\]*)*|\\cventry\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}/g);
+        const itemMatches = content.match(/\\item[^\\]*(?:\\[^item][^\\]*)*|\\cventry\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}|\\resumeItem\{[^}]*\}|\\resumeSubheading\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}/g);
         if (itemMatches) {
           itemMatches.forEach(item => {
             // Clean up LaTeX commands
@@ -193,6 +199,8 @@ function parseLatexContent(latexCode: string): {
                               .replace(/\\textit\{([^}]+)\}/g, "$1")
                               .replace(/\\\\/g, " ")
                               .replace(/\{|\}/g, "")
+                              .replace(/\\resumeItem/g, "")
+                              .replace(/\\resumeSubheading/g, "")
                               .trim();
             
             if (cleanItem) {
