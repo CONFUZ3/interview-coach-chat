@@ -40,8 +40,8 @@ function generateBasicPDF(latexCode: string): Blob {
   const content = extractContentFromLatex(latexCode);
   const parsedContent = parseLatexContent(latexCode);
   
-  // Fix: Add type check for the name property
-  if (parsedContent.name !== undefined) {
+  // Check if we successfully parsed content
+  if (parsedContent.name) {
     // Use the parsed content for better formatting
     doc.setFontSize(24);
     doc.setFont("helvetica", "bold");
@@ -49,8 +49,8 @@ function generateBasicPDF(latexCode: string): Blob {
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    // Fix: Add type check for the contact property
-    if (parsedContent.contact !== undefined) {
+    
+    if (parsedContent.contact) {
       doc.text(parsedContent.contact, 105, 30, { align: "center" });
     }
     
@@ -105,11 +105,12 @@ function generateBasicPDF(latexCode: string): Blob {
         doc.setFont("helvetica", "normal");
         y += 5;
       } else {
-        const processedLine = line.replace(/\\textbf\{([^}]+)\}/g, "$1")
-                               .replace(/\\textit\{([^}]+)\}/g, "$1")
-                               .replace(/\\\\/, "")
-                               .replace(/\\item/, "•")
-                               .replace(/\{|\}/g, "");
+        const processedLine = line
+          .replace(/\\textbf\{([^}]+)\}/g, "$1")
+          .replace(/\\textit\{([^}]+)\}/g, "$1")
+          .replace(/\\\\/, "")
+          .replace(/\\item/, "•")
+          .replace(/\{|\}/g, "");
         
         if (processedLine.trim() !== "") {
           doc.text(processedLine, 20, y);
@@ -148,21 +149,21 @@ function parseLatexContent(latexCode: string): {
     contact: undefined as string | undefined,
     sections: [] as { title: string; items: string[] }[]
   };
-  
-  // Extract name (usually in \textbf{\Huge \scshape ...} or similar)
-  const nameMatch = latexCode.match(/\\textbf\{\\Huge[^{]*\{([^}]+)\}\}/);
-  if (nameMatch) {
-    result.name = nameMatch[1];
+
+  // Extract name from article class format
+  const articleNameMatch = latexCode.match(/\\textbf\{\\Huge\s*\\scshape\s*([^}]+)\s*\}/);
+  if (articleNameMatch) {
+    result.name = articleNameMatch[1];
   } else {
-    // Alternative pattern in moderncv
-    const cvNameMatch = latexCode.match(/\\name\{([^}]+)\}/);
-    if (cvNameMatch) {
-      result.name = cvNameMatch[1];
+    // Try alternative patterns
+    const nameMatch = latexCode.match(/\\name\{([^}]+)\}\{([^}]+)\}/);
+    if (nameMatch) {
+      result.name = `${nameMatch[1]} ${nameMatch[2]}`;
     } else {
-      // Standard article class format
-      const articleNameMatch = latexCode.match(/\\textbf\{\\Huge\\s*\\scshape\s*([^}]+)\s*\}/);
-      if (articleNameMatch) {
-        result.name = articleNameMatch[1];
+      // Another format
+      const simpleName = latexCode.match(/\\begin\{center\}[\s\S]*?\\textbf\{\\Huge\s*\\scshape\s*([^}]+)\s*\}/);
+      if (simpleName) {
+        result.name = simpleName[1];
       }
     }
   }
@@ -175,9 +176,19 @@ function parseLatexContent(latexCode: string): {
       return content ? content[1] : "";
     }).filter(Boolean);
     result.contact = contactParts.join(" | ");
+  } else {
+    // Look for contact info in center environment
+    const centerMatch = latexCode.match(/\\begin\{center\}([\s\S]*?)\\end\{center\}/);
+    if (centerMatch) {
+      const centerText = centerMatch[1];
+      const contactLine = centerText.match(/\\small ([^\\]+)/);
+      if (contactLine) {
+        result.contact = contactLine[1].replace(/\$\|\$/g, " | ").trim();
+      }
+    }
   }
   
-  // Extract sections
+  // Extract sections from article class format
   const sectionMatches = latexCode.match(/\\section\{([^}]+)\}([\s\S]*?)(?=\\section\{|\\end\{document\})/g);
   if (sectionMatches) {
     sectionMatches.forEach(sectionContent => {
@@ -189,34 +200,53 @@ function parseLatexContent(latexCode: string): {
         // Extract items from this section
         const items: string[] = [];
         
-        // Look for items
-        const itemMatches = content.match(/\\item[^\\]*(?:\\[^item][^\\]*)*|\\cventry\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}|\\resumeItem\{[^}]*\}|\\resumeSubheading\{[^}]*\}\{[^}]*\}\{[^}]*\}\{[^}]*\}/g);
-        if (itemMatches) {
-          itemMatches.forEach(item => {
-            // Clean up LaTeX commands
-            let cleanItem = item.replace(/\\item/g, "")
-                              .replace(/\\textbf\{([^}]+)\}/g, "$1")
-                              .replace(/\\textit\{([^}]+)\}/g, "$1")
-                              .replace(/\\\\/g, " ")
-                              .replace(/\{|\}/g, "")
-                              .replace(/\\resumeItem/g, "")
-                              .replace(/\\resumeSubheading/g, "")
-                              .trim();
-            
-            if (cleanItem) {
-              items.push(cleanItem);
+        // Look for different item types (resumeItem, resumeSubheading, etc.)
+        const itemPatterns = [
+          /\\resumeItem\{([^}]*)\}/g,
+          /\\resumeSubheading\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}/g,
+          /\\cventry\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}/g,
+          /\\item\s+(.*?)(?=\\item|\\end\{itemize\}|$)/gs
+        ];
+        
+        let foundItems = false;
+        
+        for (const pattern of itemPatterns) {
+          const matches = content.matchAll(pattern);
+          for (const match of matches) {
+            foundItems = true;
+            if (pattern.source.includes("resumeItem")) {
+              items.push(match[1]);
+            } else if (pattern.source.includes("resumeSubheading")) {
+              items.push(`${match[1]} - ${match[3]} (${match[4]})`);
+            } else if (pattern.source.includes("cventry")) {
+              items.push(`${match[2]} at ${match[3]}, ${match[1]}`);
+              if (match[6] && match[6] !== "{}") {
+                items.push(match[6]);
+              }
+            } else if (pattern.source.includes("item")) {
+              items.push(match[1].trim());
             }
-          });
-        } else if (content.trim()) {
-          // If no items found but section has content, add it as plain text
-          items.push(content.replace(/\\textbf\{([^}]+)\}/g, "$1")
-                           .replace(/\\textit\{([^}]+)\}/g, "$1")
-                           .replace(/\\\\/g, " ")
-                           .replace(/\{|\}/g, "")
-                           .trim());
+          }
         }
         
-        result.sections.push({ title, items });
+        // If no structured items found but there's content, add it as plain text
+        if (!foundItems && content.trim()) {
+          items.push(content
+            .replace(/\\begin\{itemize\}|\\\end\{itemize\}|\\\begin\{enumerate\}|\\\end\{enumerate\}/g, "")
+            .replace(/\\resumeSubHeadingListStart|\\\resumeSubHeadingListEnd|\\\resumeItemListStart|\\\resumeItemListEnd/g, "")
+            .trim());
+        }
+        
+        // Clean up the items
+        const cleanItems = items.map(item => 
+          item.replace(/\\textbf\{([^}]+)\}/g, "$1")
+              .replace(/\\textit\{([^}]+)\}/g, "$1")
+              .replace(/\\\\/g, " ")
+              .replace(/\{|\}/g, "")
+              .trim()
+        ).filter(item => item.length > 0);
+        
+        result.sections.push({ title, items: cleanItems });
       }
     });
   }

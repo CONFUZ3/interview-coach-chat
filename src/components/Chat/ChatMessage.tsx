@@ -9,9 +9,9 @@ import { useEffect, useState } from "react";
 
 interface ChatMessageProps {
   message: MessageType;
-  onCopy?: () => void;
-  onDownload?: () => void;
-  onDownloadLatex?: () => void;
+  onCopy?: (content: string) => void;
+  onDownload?: (content: string) => void;
+  onDownloadLatex?: (content: string) => void;
 }
 
 export default function ChatMessage({ message, onCopy, onDownload, onDownloadLatex }: ChatMessageProps) {
@@ -95,7 +95,7 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={onCopy} className="h-8 w-8">
+                    <Button variant="ghost" size="icon" onClick={() => onCopy?.(message.content)} className="h-8 w-8">
                       <Copy className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -110,7 +110,7 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={onDownload} className="h-8 w-8">
+                        <Button variant="ghost" size="icon" onClick={() => onDownload?.(message.content)} className="h-8 w-8">
                           <DownloadCloud className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -124,7 +124,7 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={onDownloadLatex} className="h-8 w-8">
+                          <Button variant="ghost" size="icon" onClick={() => onDownloadLatex(message.content)} className="h-8 w-8">
                             <FileText className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -186,37 +186,25 @@ function extractResumePreviewFromLatex(latexCode: string): string {
       return;
     }
     
-    // Detect cventry (for moderncv package)
+    // Detect cventry (for moderncv package) - Fixed the duplicate _ variable issue
     if (line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
       const match = line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
       if (match) {
-        // Fix: use different variable names for unused values
-        const [unused1, date, role, company, location, unused2, description] = match;
+        // Fixed variable naming to avoid duplicate "_" variables
+        const [, date, role, company, location, extra, description] = match;
         sections.push(`### ${role} at ${company}`);
         sections.push(`${date} | ${location}`);
         if (description && description !== "{}") {
           sections.push(description.replace(/\\textbf\{([^}]+)\}/g, "**$1**")
-                                 .replace(/\\textit\{([^}]+)\}/g, "*$1*"));
+                               .replace(/\\textit\{([^}]+)\}/g, "*$1*"));
         }
       }
       return;
     }
     
-    // Detect resumeSubheading (for article template)
-    if (line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
-      const match = line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
-      if (match) {
-        const [_, title, date, organization, location] = match;
-        sections.push(`### ${title} at ${organization}`);
-        sections.push(`${date} | ${location}`);
-      }
-      return;
-    }
-    
     // Detect items
-    if (line.match(/\\item\s|\\resumeItem\{/)) {
+    if (line.match(/\\item\s/)) {
       const itemText = line.replace(/\\item\s+/, "")
-                          .replace(/\\resumeItem\{([^}]+)\}/, "$1")
                           .replace(/\\textbf\{([^}]+)\}/g, "**$1**")
                           .replace(/\\textit\{([^}]+)\}/g, "*$1*")
                           .trim();

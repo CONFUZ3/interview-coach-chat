@@ -24,17 +24,16 @@ const ResumePage = () => {
         
         <Alert className="mb-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
           <Info className="h-4 w-4 text-blue-500" />
-          <AlertTitle className="text-sm">LaTeX Resume Builder</AlertTitle>
+          <AlertTitle className="text-sm">Quick Guide</AlertTitle>
           <AlertDescription className="text-xs mt-1 flex flex-wrap gap-x-4">
-            <span>1. Complete profile first</span>
-            <span>2. Upload previous resume (optional)</span>
-            <span>3. Enter job description</span>
-            <span>4. Download as PDF or LaTeX</span>
+            <span>1. Upload previous resume</span>
+            <span>2. Enter job description</span>
+            <span>3. Download as PDF or LaTeX</span>
           </AlertDescription>
         </Alert>
         
         <Card className="mb-4 bg-accent/50">
-          <CardContent className="py-3">
+          <CardContent className="py-2">
             <CardDescription className="flex flex-wrap justify-between gap-2 text-xs">
               <div className="flex items-center">
                 <Upload className="h-3 w-3 mr-1" />

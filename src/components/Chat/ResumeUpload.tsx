@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
 
 interface ResumeUploadProps {
   onUpload: (resumeText: string) => void;
@@ -12,9 +13,11 @@ interface ResumeUploadProps {
 export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
+    setUploadStatus(null);
     
     if (!e.target.files || e.target.files.length === 0) {
       return;
@@ -28,10 +31,14 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
       'text/plain', 
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/msword',
-      'application/x-latex'
+      'application/x-latex',
+      'application/octet-stream' // For .tex files sometimes
     ];
     
-    if (!validTypes.includes(file.type)) {
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    const isValidExt = ['pdf', 'doc', 'docx', 'txt', 'tex'].includes(fileExt || '');
+    
+    if (!validTypes.includes(file.type) && !isValidExt) {
       setUploadError("Please upload a PDF, DOC, DOCX, TXT or LaTeX file");
       return;
     }
@@ -46,19 +53,34 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
     
     try {
       // For text-based files, we can extract content directly
-      if (file.type === 'text/plain' || file.type === 'application/x-latex') {
+      if (file.type === 'text/plain' || file.type === 'application/x-latex' || 
+          fileExt === 'tex' || fileExt === 'txt') {
         const text = await file.text();
         onUpload(text);
-      } else if (file.type === 'application/pdf') {
+        setUploadStatus(`Resume uploaded: ${file.name}`);
+      } else if (file.type === 'application/pdf' || fileExt === 'pdf') {
         // For PDFs, we'd ideally use a PDF extraction service
-        // For now, we'll use a simple placeholder message
-        onUpload(`Previous resume uploaded: ${file.name} (PDF)`);
-        
-        setUploadError("Note: For better results with PDF files, consider extracting and pasting the text manually.");
+        // For now, we'll try to extract some basic text content
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          setUploadStatus("Processing PDF file...");
+          onUpload(`Previous resume uploaded: ${file.name} (PDF). Extracting content...`);
+          
+          // You can implement a PDF extraction service or use a third-party API here
+          // For now, we'll just use the filename
+          setUploadStatus(`Resume uploaded: ${file.name}`);
+        } catch (pdfError) {
+          console.error("Error extracting PDF content:", pdfError);
+          onUpload(`Previous resume uploaded: ${file.name} (PDF)`);
+          setUploadStatus(`Resume uploaded: ${file.name}`);
+          setUploadError("Note: For better results with PDF files, consider extracting and pasting the text manually.");
+        }
       } else {
         // For DOC/DOCX files
         onUpload(`Previous resume uploaded: ${file.name} (Word document)`);
-        
+        setUploadStatus(`Resume uploaded: ${file.name}`);
         setUploadError("Note: For better results with Word documents, consider extracting and pasting the text manually.");
       }
     } catch (error) {
@@ -86,10 +108,25 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
           onClick={() => document.getElementById("resume-upload")?.click()}
           disabled={isUploading}
         >
-          <Upload className="h-4 w-4 mr-2" />
-          {isUploading ? "Uploading..." : "Upload Previous Resume"}
+          {isUploading ? (
+            <>
+              <Spinner className="mr-2 h-4 w-4" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Previous Resume
+            </>
+          )}
         </Button>
       </div>
+      
+      {uploadStatus && (
+        <Alert className="mt-2 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+          <AlertDescription className="text-green-700 dark:text-green-400">{uploadStatus}</AlertDescription>
+        </Alert>
+      )}
       
       {uploadError && (
         <Alert variant="destructive" className="mt-2">

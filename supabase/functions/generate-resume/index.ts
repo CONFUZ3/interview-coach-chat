@@ -40,29 +40,46 @@ serve(async (req) => {
       );
     }
 
-    if (!userProfile || !userProfile.fullName) {
-      return new Response(
-        JSON.stringify({ error: "User profile is incomplete" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
-    }
+    // Format basic user information - allow using just uploaded resume instead of full profile
+    let fullName = "Your Name";
+    let email = "email@example.com";
+    let phone = "(123) 456-7890";
+    let profileText = "Resume information will be extracted from your uploaded document";
+    
+    if (userProfile && userProfile.fullName) {
+      fullName = userProfile.fullName;
+      email = userProfile.email || email;
+      phone = userProfile.phone || phone;
+      
+      // Format user profile if available
+      if (userProfile.education || userProfile.experience || userProfile.skills) {
+        const { education, experience, skills } = userProfile;
+        
+        const educationText = education && education.length > 0
+          ? education.map(edu => `${edu.degree} from ${edu.institution}, ${edu.graduationDate}`).join("\n")
+          : "No education information provided";
+        
+        const experienceText = experience && experience.length > 0
+          ? experience.map(exp => 
+            `${exp.position} at ${exp.company}, ${exp.startDate} to ${exp.endDate}\n${exp.description}`
+          ).join("\n\n")
+          : "No work experience provided";
+        
+        const skillsText = skills && skills.length > 0
+          ? skills.join(", ")
+          : "No skills provided";
+        
+        profileText = `
+Education:
+${educationText}
 
-    // Format user profile for the prompt
-    const { fullName, email, phone, education, experience, skills } = userProfile;
-    
-    const educationText = education && education.length > 0
-      ? education.map(edu => `${edu.degree} from ${edu.institution}, ${edu.graduationDate}`).join("\n")
-      : "No education information provided";
-    
-    const experienceText = experience && experience.length > 0
-      ? experience.map(exp => 
-        `${exp.position} at ${exp.company}, ${exp.startDate} to ${exp.endDate}\n${exp.description}`
-      ).join("\n\n")
-      : "No work experience provided";
-    
-    const skillsText = skills && skills.length > 0
-      ? skills.join(", ")
-      : "No skills provided";
+Work Experience:
+${experienceText}
+
+Skills:
+${skillsText}`;
+      }
+    }
 
     // LaTeX template for article class (ATS-friendly)
     const latexTemplate = `
@@ -79,6 +96,8 @@ serve(async (req) => {
 \\usepackage{fancyhdr}
 \\usepackage[english]{babel}
 \\usepackage{tabularx}
+\\usepackage[scale=0.75]{geometry}
+\\input{glyphtounicode}
 
 \\pagestyle{fancy}
 \\fancyhf{} % clear all header and footer fields
@@ -103,6 +122,9 @@ serve(async (req) => {
 \\titleformat{\\section}{
   \\vspace{-4pt}\\scshape\\raggedright\\large
 }{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\\pdfgentounicode=1
 
 %-------------------------
 % Custom commands
@@ -144,7 +166,7 @@ serve(async (req) => {
 \\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
 `;
 
-    // Improved LaTeX-focused prompt for Gemini based on the Python template
+    // Improved LaTeX-focused prompt for Gemini
     const prompt = `
 You are an expert LaTeX formatter specializing in professional resumes. Your job is to transform the provided 
 personal information and job description into a structured, well-formatted LaTeX resume.
@@ -154,7 +176,7 @@ personal information and job description into a structured, well-formatted LaTeX
 2. Ensure correct syntax and escaping. Escape any LaTeX special characters in user data.
 3. The output must be directly compilable.
 4. Use the article class with the resumeItem and resumeSubheading commands provided in the template.
-5. Do NOT use the moderncv package. Instead use the provided template with article class.
+5. Follow the provided template EXACTLY - do NOT substitute with moderncv or any other package.
 
 ### Resume Bullet Points:
 • Each bullet point must reflect a specific achievement or contribution.
@@ -162,21 +184,14 @@ personal information and job description into a structured, well-formatted LaTeX
 • Use strong action verbs and quantify results where possible (e.g., 'Boosted efficiency by 30%').
 • NEVER mention "STAR technique" anywhere in the output.
 
-### TEMPLATE TO USE:
+### TEMPLATE TO USE (DO NOT MODIFY THE TEMPLATE STRUCTURE):
 ${latexTemplate}
 
 ### CANDIDATE INFORMATION:
 Name: ${fullName}
 Contact: ${email} | ${phone}
 
-Education:
-${educationText}
-
-Work Experience:
-${experienceText}
-
-Skills:
-${skillsText}
+${profileText}
 
 ### JOB DESCRIPTION:
 ${jobDescription}
@@ -193,7 +208,49 @@ The basic structure of the resume should be:
 4. Education section
 5. Skills section
 
-For the experience section, use the \\resumeSubHeadingListStart, \\resumeSubheading, and \\resumeItemListStart commands properly.
+Structure the resume using article class following this pattern:
+
+\\begin{document}
+
+%----------HEADING----------
+\\begin{center}
+    \\textbf{\\Huge \\scshape Full Name} \\\\ \\vspace{1pt}
+    \\small City, State $\\cdot$
+    \\small Phone  $\\cdot$
+    \\small Email
+    \\linebreak
+    \\small LinkedIn
+\\end{center}
+
+%-----------EXPERIENCE-----------
+\\section{Experience}
+  \\resumeSubHeadingListStart
+    \\resumeSubheading
+      {Job Title}{Date}
+      {Company}{Location}
+      \\resumeItemListStart
+        \\resumeItem{Achievement with metrics}
+        \\resumeItem{Another achievement with metrics}
+      \\resumeItemListEnd
+  \\resumeSubHeadingListEnd
+
+%-----------EDUCATION-----------
+\\section{Education}
+  \\resumeSubHeadingListStart
+    \\resumeSubheading
+      {University Name}{Location}
+      {Degree}{Date}
+  \\resumeSubHeadingListEnd
+
+%-----------SKILLS-----------
+\\section{Skills}
+ \\begin{itemize}[leftmargin=0.15in, label={}]
+    \\small{\\item{
+     Skill1 | Skill2 | Skill3
+    }}
+ \\end{itemize}
+
+\\end{document}
 `;
 
     console.log("Calling Gemini API with prompt");

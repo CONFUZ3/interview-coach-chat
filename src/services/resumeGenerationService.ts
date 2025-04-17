@@ -23,13 +23,14 @@ export async function generateResumeWithAI(jobDescription: string, previousResum
     }
 
     console.log("Calling Supabase function with job description and profile data");
+    console.log("Previous resume provided:", !!previousResume);
     
     // Pass the previousResume to the generate-resume function if available
     const { data, error } = await supabase.functions.invoke('generate-resume', {
       body: { 
         jobDescription, 
         userProfile, 
-        previousResume 
+        previousResume: previousResume || null
       },
     });
 
