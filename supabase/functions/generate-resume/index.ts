@@ -21,7 +21,7 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY is not set');
     }
 
-    const { jobDescription, userProfile } = await req.json();
+    const { jobDescription, userProfile, previousResume } = await req.json();
 
     // Ensure we have necessary data
     if (!jobDescription) {
@@ -55,9 +55,10 @@ serve(async (req) => {
       ? skills.join(", ")
       : "No skills provided";
 
-    // Improved prompt for Gemini with clearer structure and LaTeX-like formatting
+    // Improved prompt for Gemini with LaTeX formatting requirements
     const prompt = `
-You are an expert resume writer. Create a professional, ATS-optimized resume for ${fullName} who is applying for this job:
+You are an expert resume writer tasked with creating a professional LaTeX resume using the moderncv package. 
+Create a professional, ATS-optimized resume for ${fullName} who is applying for this job:
 
 JOB DESCRIPTION:
 ${jobDescription}
@@ -75,16 +76,22 @@ ${experienceText}
 Skills:
 ${skillsText}
 
-Format requirements:
-1. Create a clear, concise, professional resume that's optimized for ATS systems
-2. Focus only on relevant experience and skills that match the job description
-3. Use the STAR format (Situation, Task, Action, Result) for achievements
-4. For each experience, provide 2-4 bullet points with quantifiable achievements
-5. Organize the resume in clear sections with proper formatting
-6. Make every word count - the resume should be concise and impactful
-7. Include a professional summary at the top that matches the candidate's experience with the job requirements
+${previousResume ? `PREVIOUS RESUME CONTENT (use this as reference):\n${previousResume}` : ''}
 
-Return ONLY the formatted resume content with proper section headers (EDUCATION, EXPERIENCE, SKILLS, etc.). The content will be used to generate a PDF, so ensure proper formatting with clear section breaks.
+Format requirements:
+1. Generate a COMPLETE, COMPILABLE LaTeX document using the moderncv package with classic style
+2. Focus only on relevant experience and skills that match the job description
+3. Create quantifiable achievements for each experience
+4. For each experience, provide 2-4 bullet points with accomplishments
+5. Make every word count - the resume should be concise and impactful
+6. Do not include any markdown formatting, only LaTeX code
+7. Do not include asterisks (*) or any other non-LaTeX formatting
+8. Do not mention "STAR technique" anywhere in the content
+9. Use proper LaTeX commands for formatting (\\textbf, \\textit, etc.)
+10. Include a complete preamble with all necessary LaTeX packages
+
+Return ONLY the LaTeX code, starting with \\documentclass and ending with \\end{document}.
+The code must be properly formatted and ready to be compiled with pdflatex without any errors.
 `;
 
     console.log("Calling Gemini API with prompt");
@@ -103,7 +110,7 @@ Return ONLY the formatted resume content with proper section headers (EDUCATION,
         }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 4096,
         }
       })
     });
@@ -116,22 +123,22 @@ Return ONLY the formatted resume content with proper section headers (EDUCATION,
 
     const data = await response.json();
     
-    // Extract resume text from Gemini response (updated format)
-    let resumeText = "";
+    // Extract LaTeX code from Gemini response
+    let latexContent = "";
     if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
-      resumeText = data.candidates[0].content.parts[0].text;
+      latexContent = data.candidates[0].content.parts[0].text;
     } else {
       console.error("Unexpected response format:", JSON.stringify(data));
       throw new Error("Unexpected response format from Gemini API");
     }
 
-    console.log("Resume generated successfully");
+    console.log("LaTeX resume generated successfully");
     
-    // Return the generated resume with profile data for integrated PDF creation
+    // Return the generated LaTeX with profile data
     return new Response(
       JSON.stringify({ 
-        resume: resumeText,
-        profile: userProfile  // Include profile data in the response
+        resumeLatex: latexContent,
+        profile: userProfile
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );

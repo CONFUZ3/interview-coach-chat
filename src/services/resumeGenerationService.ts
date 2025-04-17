@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getUserProfile } from "./profileService";
 import type { ProfileData } from "./profileService";
 
-export async function generateResumeWithAI(jobDescription: string): Promise<{ resumeText: string, profileData: ProfileData }> {
+export async function generateResumeWithAI(jobDescription: string, previousResume?: string): Promise<{ resumeText: string, resumeLatex: string, profileData: ProfileData }> {
   const userProfile = await getUserProfile();
   
   if (!userProfile) {
@@ -12,7 +12,7 @@ export async function generateResumeWithAI(jobDescription: string): Promise<{ re
   
   try {
     const { data, error } = await supabase.functions.invoke('generate-resume', {
-      body: { jobDescription, userProfile },
+      body: { jobDescription, userProfile, previousResume },
     });
 
     if (error) {
@@ -20,12 +20,13 @@ export async function generateResumeWithAI(jobDescription: string): Promise<{ re
       throw error;
     }
 
-    if (!data || !data.resume) {
+    if (!data || (!data.resume && !data.resumeLatex)) {
       throw new Error("Invalid response format from resume generation");
     }
 
     return {
-      resumeText: data.resume,
+      resumeText: data.resume || data.resumeLatex,
+      resumeLatex: data.resumeLatex || "",
       profileData: userProfile
     };
   } catch (error) {

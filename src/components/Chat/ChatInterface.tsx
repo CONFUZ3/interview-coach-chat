@@ -11,7 +11,7 @@ export type MessageType = {
   timestamp: Date;
   isTyping?: boolean;
   category?: "general" | "resume" | "interview";
-  format?: "text" | "resume" | "feedback";
+  format?: "text" | "resume" | "feedback" | "latex";
 };
 
 interface ChatInterfaceProps {
@@ -23,11 +23,14 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     messages,
     isProcessing,
     lastGeneratedResume,
+    lastGeneratedLatex,
     conversationId,
     handleMessageSubmit,
     copyToClipboard,
     downloadAsText,
-    downloadAsPDF
+    downloadAsPDF,
+    downloadLatexSource,
+    handleResumeUpload
   } = useChat(mode);
 
   return (
@@ -36,18 +39,20 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
         messages={messages} 
         onCopyMessage={copyToClipboard}
         onDownloadMessage={(content) => 
-          downloadAsText(
-            content, 
-            `${mode === "resume" ? "resume" : "interview"}_${new Date().toISOString().split('T')[0]}.txt`
-          )
+          downloadAsPDF(content, !!lastGeneratedLatex)
         }
+        onDownloadLatex={lastGeneratedLatex ? 
+          (content) => downloadLatexSource(content) : undefined}
       />
       
       <div className="p-4 border-t">
         {mode === "resume" && (
           <ResumeActions 
-            hasResume={!!lastGeneratedResume} 
-            onDownloadPDF={downloadAsPDF} 
+            hasResume={!!lastGeneratedResume || !!lastGeneratedLatex} 
+            isLatex={!!lastGeneratedLatex}
+            onDownloadPDF={() => downloadAsPDF(lastGeneratedLatex || lastGeneratedResume || "", !!lastGeneratedLatex)}
+            onDownloadLatex={lastGeneratedLatex ? () => downloadLatexSource(lastGeneratedLatex) : undefined}
+            onUploadResume={handleResumeUpload}
           />
         )}
         
