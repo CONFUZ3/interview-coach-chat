@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { MessageType } from "./ChatInterface";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from "react";
 
 interface ChatMessageProps {
   message: MessageType;
@@ -14,6 +15,14 @@ interface ChatMessageProps {
 }
 
 export default function ChatMessage({ message, onCopy, onDownload, onDownloadLatex }: ChatMessageProps) {
+  const [resumePreview, setResumePreview] = useState<string>("");
+
+  useEffect(() => {
+    if (message.format === "latex") {
+      setResumePreview(extractResumePreviewFromLatex(message.content));
+    }
+  }, [message.content, message.format]);
+
   if (message.isTyping) {
     return (
       <div className="flex justify-start mb-4">
@@ -49,9 +58,19 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
                     <p className="text-sm text-muted-foreground mb-2">
                       LaTeX resume generated successfully. Use the download buttons to get your formatted resume.
                     </p>
-                    <pre className="text-xs p-2 bg-muted rounded-md max-h-60 overflow-auto">
-                      {extractResumePreviewFromLatex(message.content)}
-                    </pre>
+                    <div className="text-xs p-2 bg-muted rounded-md max-h-60 overflow-auto">
+                      {resumePreview.split('\n').map((line, index) => {
+                        if (line.startsWith('## ')) {
+                          return <h2 key={index} className="text-sm font-bold mt-2">{line.replace('## ', '')}</h2>;
+                        } else if (line.startsWith('### ')) {
+                          return <h3 key={index} className="text-xs font-semibold">{line.replace('### ', '')}</h3>;
+                        } else if (line.startsWith('- ')) {
+                          return <div key={index} className="ml-2">• {line.replace('- ', '')}</div>;
+                        } else {
+                          return <div key={index}>{line}</div>;
+                        }
+                      })}
+                    </div>
                   </div>
                 </TabsContent>
                 <TabsContent value="source">
@@ -167,11 +186,37 @@ function extractResumePreviewFromLatex(latexCode: string): string {
       return;
     }
     
+    // Detect cventry (for moderncv package)
+    if (line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
+      const match = line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
+      if (match) {
+        const [_, date, role, company, location, _, description] = match;
+        sections.push(`### ${role} at ${company}`);
+        sections.push(`${date} | ${location}`);
+        if (description && description !== "{}") {
+          sections.push(description.replace(/\\textbf\{([^}]+)\}/g, "**$1**")
+                                 .replace(/\\textit\{([^}]+)\}/g, "*$1*"));
+        }
+      }
+      return;
+    }
+    
+    // Detect items
+    if (line.match(/\\item\s/)) {
+      const itemText = line.replace(/\\item\s+/, "")
+                          .replace(/\\textbf\{([^}]+)\}/g, "**$1**")
+                          .replace(/\\textit\{([^}]+)\}/g, "*$1*")
+                          .trim();
+      if (itemText) {
+        sections.push(`- ${itemText}`);
+      }
+      return;
+    }
+    
     // Clean up some LaTeX commands for better preview
     const cleanedLine = line
       .replace(/\\textbf\{([^}]+)\}/g, "**$1**")
       .replace(/\\textit\{([^}]+)\}/g, "*$1*")
-      .replace(/\\item\s?/g, "- ")
       .replace(/\\\\/, "")
       .replace(/\\href\{([^}]+)\}\{([^}]+)\}/g, "$2 ($1)")
       .trim();

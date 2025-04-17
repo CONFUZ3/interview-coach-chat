@@ -7,6 +7,7 @@ import { compileLatexToPDF } from "./latexService";
 export async function generatePDF(resumeContent: string, profileData: ProfileData, isLatex: boolean = false): Promise<Blob> {
   if (isLatex) {
     try {
+      // If it's LaTeX content, use the LaTeX compiler
       return await compileLatexToPDF(resumeContent);
     } catch (error) {
       console.error("Error compiling LaTeX:", error);

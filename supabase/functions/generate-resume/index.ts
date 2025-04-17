@@ -64,15 +64,32 @@ serve(async (req) => {
       ? skills.join(", ")
       : "No skills provided";
 
-    // Improved prompt for Gemini with LaTeX formatting requirements
+    // Improved LaTeX-focused prompt for Gemini based on the Python template
     const prompt = `
-You are an expert resume writer tasked with creating a professional LaTeX resume using the moderncv package. 
-Create a professional, ATS-optimized resume for ${fullName} who is applying for this job:
+You are an expert LaTeX formatter specializing in professional resumes. Your job is to transform the provided 
+personal information and job description into a structured, well-formatted LaTeX resume.
 
-JOB DESCRIPTION:
-${jobDescription}
+### Formatting Rules:
+1. Output must be 100% valid LaTeX code. No explanations, comments, or additional text.
+2. Ensure correct syntax and escaping. Escape any LaTeX special characters in user data.
+3. The output must be directly compilable.
+4. Use the moderncv package with classic style for formatting.
 
-CANDIDATE INFORMATION:
+### Resume Bullet Points:
+• Each bullet point must reflect a specific achievement or contribution.
+• Make each point unique, impactful, and measurable.
+• Use strong action verbs and quantify results where possible (e.g., 'Boosted efficiency by 30%').
+• NEVER mention "STAR technique" anywhere in the output.
+
+### Good Examples of Bullet Points:
+- "Led a team of 5 engineers to develop a machine learning model, reducing data processing time by 40%."
+- "Revamped customer support system, decreasing resolution time from 48 to 12 hours."
+
+### Bad Examples to Avoid:
+- "Worked on various machine learning projects."
+- "Helped improve company performance."
+
+### CANDIDATE INFORMATION:
 Name: ${fullName}
 Contact: ${email} | ${phone}
 
@@ -85,22 +102,13 @@ ${experienceText}
 Skills:
 ${skillsText}
 
-${previousResume ? `PREVIOUS RESUME CONTENT (use this as reference):\n${previousResume}` : ''}
+### JOB DESCRIPTION:
+${jobDescription}
 
-Format requirements:
-1. Generate a COMPLETE, COMPILABLE LaTeX document using the moderncv package with classic style
-2. Focus only on relevant experience and skills that match the job description
-3. Create quantifiable achievements for each experience
-4. For each experience, provide 2-4 bullet points with accomplishments
-5. Make every word count - the resume should be concise and impactful
-6. Do not include any markdown formatting, only LaTeX code
-7. Do not include asterisks (*) or any other non-LaTeX formatting
-8. Do not mention "STAR technique" anywhere in the content
-9. Use proper LaTeX commands for formatting (\\textbf, \\textit, etc.)
-10. Include a complete preamble with all necessary LaTeX packages
+${previousResume ? `### PREVIOUS RESUME CONTENT (use this as reference):\n${previousResume}` : ''}
 
-Return ONLY the LaTeX code, starting with \\documentclass and ending with \\end{document}.
-The code must be properly formatted and ready to be compiled with pdflatex without any errors.
+Create a complete, compilable LaTeX document using the moderncv package that contains only LaTeX code.
+Return ONLY valid LaTeX code starting with \\documentclass and ending with \\end{document}.
 `;
 
     console.log("Calling Gemini API with prompt");
@@ -141,6 +149,14 @@ The code must be properly formatted and ready to be compiled with pdflatex witho
       latexContent = latexContent.replace(/\*\*/g, ''); // Remove markdown bold
       latexContent = latexContent.replace(/\*/g, '');   // Remove markdown italic
       latexContent = latexContent.replace(/STAR technique/gi, ''); // Remove any STAR mentions
+      
+      // If the response doesn't start with \documentclass, extract only the LaTeX portion
+      if (!latexContent.trim().startsWith("\\documentclass")) {
+        const match = latexContent.match(/\\documentclass.*?\\end{document}/s);
+        if (match) {
+          latexContent = match[0];
+        }
+      }
     } else {
       console.error("Unexpected response format:", JSON.stringify(data));
       throw new Error("Unexpected response format from Gemini API");

@@ -22,7 +22,7 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
     
     const file = e.target.files[0];
     
-    // Check file type - fixed the comparison to avoid type errors
+    // Check file type
     const validTypes = [
       'application/pdf', 
       'text/plain', 
@@ -45,18 +45,21 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
     setIsUploading(true);
     
     try {
-      // For simplicity, we're just reading text files directly
-      // In a production app, you would use a library to extract text from PDFs and DOCs
+      // For text-based files, we can extract content directly
       if (file.type === 'text/plain' || file.type === 'application/x-latex') {
         const text = await file.text();
         onUpload(text);
-      } else {
-        // For this demo, we'll just use a simple placeholder text for other file types
-        // In production, you would use a proper document text extraction service
-        onUpload(`Content extracted from ${file.name}`);
+      } else if (file.type === 'application/pdf') {
+        // For PDFs, we'd ideally use a PDF extraction service
+        // For now, we'll use a simple placeholder message
+        onUpload(`Previous resume uploaded: ${file.name} (PDF)`);
         
-        // Show a warning if it's not a text file
-        setUploadError("Note: For non-text files, proper text extraction would require server-side processing.");
+        setUploadError("Note: For better results with PDF files, consider extracting and pasting the text manually.");
+      } else {
+        // For DOC/DOCX files
+        onUpload(`Previous resume uploaded: ${file.name} (Word document)`);
+        
+        setUploadError("Note: For better results with Word documents, consider extracting and pasting the text manually.");
       }
     } catch (error) {
       console.error("Error reading file:", error);
