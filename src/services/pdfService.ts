@@ -35,11 +35,18 @@ function generateBasicPDF(resumeContent: string, profileData: ProfileData): Blob
   doc.setLineWidth(0.5);
   doc.line(20, 32, 190, 32);
   
-  // Resume content
+  // Resume content - clean up any markdown or non-printable characters
+  const cleanedContent = resumeContent
+    .replace(/\*\*/g, '') // Remove bold markdown
+    .replace(/\*/g, '')   // Remove italic markdown
+    .replace(/STAR technique/gi, '') // Remove STAR mentions
+    .replace(/\\textbf\{([^}]+)\}/g, "$1") // Clean LaTeX formatting
+    .replace(/\\textit\{([^}]+)\}/g, "$1");
+  
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
   
-  const splitContent = doc.splitTextToSize(resumeContent, 170);
+  const splitContent = doc.splitTextToSize(cleanedContent, 170);
   doc.text(splitContent, 20, 40);
   
   return doc.output("blob");

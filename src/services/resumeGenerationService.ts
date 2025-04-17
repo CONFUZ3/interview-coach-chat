@@ -11,6 +11,12 @@ export async function generateResumeWithAI(jobDescription: string, previousResum
   }
   
   try {
+    // Get the current session to include authentication token
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      throw new Error("Authentication required to generate resume");
+    }
+
     const { data, error } = await supabase.functions.invoke('generate-resume', {
       body: { jobDescription, userProfile, previousResume },
     });

@@ -13,13 +13,23 @@ const Index = () => {
     // Check if user is already authenticated with Supabase
     const checkAuth = async () => {
       setIsLoading(true);
-      const { data } = await supabase.auth.getSession();
-      
-      if (data.session) {
-        navigate("/dashboard");
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error checking auth session:", error);
+          setIsLoading(false);
+          return;
+        }
+        
+        if (data.session) {
+          navigate("/dashboard");
+        }
+      } catch (e) {
+        console.error("Authentication check failed:", e);
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     };
     
     checkAuth();

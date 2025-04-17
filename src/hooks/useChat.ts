@@ -27,32 +27,49 @@ export function useChat(mode: "resume" | "interview") {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const { data: session } = useQuery({
+  // Improved authentication handling
+  const { data: sessionData, isLoading: isSessionLoading } = useQuery({
     queryKey: ['session'],
     queryFn: async () => {
-      const { data } = await supabase.auth.getSession();
-      return data.session;
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Error fetching session:", error);
+        throw error;
+      }
+      return data;
     },
   });
 
+  // Setup auth state change listener
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        navigate("/");
-        toast({
-          title: "Authentication required",
-          description: "Please sign in to use this feature.",
-          variant: "destructive",
-        });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        if (event === 'SIGNED_OUT') {
+          navigate("/");
+        }
       }
-    };
+    );
     
-    checkAuth();
-  }, [navigate, toast]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   useEffect(() => {
-    if (session?.user) {
+    if (isSessionLoading) return;
+    
+    if (!sessionData?.session) {
+      navigate("/");
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to use this feature.",
+        variant: "destructive",
+      });
+    }
+  }, [sessionData, isSessionLoading, navigate, toast]);
+
+  useEffect(() => {
+    if (sessionData?.session) {
       async function initConversation() {
         try {
           const conversation = await createConversation();
@@ -71,7 +88,7 @@ export function useChat(mode: "resume" | "interview") {
       
       initConversation();
     }
-  }, [session, toast]);
+  }, [sessionData, toast]);
 
   useEffect(() => {
     const initialMessage: MessageType = {
@@ -291,8 +308,8 @@ export function useChat(mode: "resume" | "interview") {
           await saveMessage(conversationId, aiMessage);
         }
         
-        if (session?.user) {
-          await saveResume(session.user.id, conversationId, result.resumeLatex || result.resumeText);
+        if (sessionData?.session?.user) {
+          await saveResume(sessionData.session.user.id, conversationId, result.resumeLatex || result.resumeText);
         }
       } else if (mode === "interview") {
         setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
@@ -359,8 +376,27 @@ export function useChat(mode: "resume" | "interview") {
     lastGeneratedLatex,
     conversationId,
     handleMessageSubmit,
-    copyToClipboard,
-    downloadAsText,
+    copyToClipboard: (content: string) => {
+      navigator.clipboard.writeText(content);
+      toast({
+        title: "Copied to clipboard",
+        description: "Content has been copied to your clipboard.",
+      });
+    },
+    downloadAsText: (content: string, filename = "resume.txt") => {
+      const element = document.createElement("a");
+      const file = new Blob([content], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = filename;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      
+      toast({
+        title: "Download started",
+        description: `${filename} is being downloaded.`,
+      });
+    },
     downloadAsPDF,
     downloadLatexSource,
     handleResumeUpload

@@ -22,14 +22,16 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
     
     const file = e.target.files[0];
     
-    // Check file type
-    if (
-      file.type !== 'application/pdf' && 
-      file.type !== 'text/plain' && 
-      file.type !== 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' &&
-      file.type !== 'application/msword' &&
-      file.type !== 'application/x-latex'
-    ) {
+    // Check file type - fixed the comparison to avoid type errors
+    const validTypes = [
+      'application/pdf', 
+      'text/plain', 
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'application/x-latex'
+    ];
+    
+    if (!validTypes.includes(file.type)) {
       setUploadError("Please upload a PDF, DOC, DOCX, TXT or LaTeX file");
       return;
     }
@@ -54,9 +56,7 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
         onUpload(`Content extracted from ${file.name}`);
         
         // Show a warning if it's not a text file
-        if (file.type !== 'text/plain') {
-          setUploadError("Note: For non-text files, proper text extraction would require server-side processing.");
-        }
+        setUploadError("Note: For non-text files, proper text extraction would require server-side processing.");
       }
     } catch (error) {
       console.error("Error reading file:", error);

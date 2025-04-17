@@ -21,6 +21,15 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY is not set');
     }
 
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
+    }
+
     const { jobDescription, userProfile, previousResume } = await req.json();
 
     // Ensure we have necessary data
@@ -127,6 +136,11 @@ The code must be properly formatted and ready to be compiled with pdflatex witho
     let latexContent = "";
     if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
       latexContent = data.candidates[0].content.parts[0].text;
+      
+      // Clean the LaTeX content to remove any non-LaTeX formatting that might have been included
+      latexContent = latexContent.replace(/\*\*/g, ''); // Remove markdown bold
+      latexContent = latexContent.replace(/\*/g, '');   // Remove markdown italic
+      latexContent = latexContent.replace(/STAR technique/gi, ''); // Remove any STAR mentions
     } else {
       console.error("Unexpected response format:", JSON.stringify(data));
       throw new Error("Unexpected response format from Gemini API");

@@ -15,12 +15,14 @@ export default function AuthForm() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [name, setName] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage("");
 
     try {
       if (activeTab === "login") {
@@ -72,6 +74,7 @@ export default function AuthForm() {
         navigate("/dashboard");
       }
     } catch (error: any) {
+      setErrorMessage(error?.message || "Authentication failed. Please try again.");
       toast({
         title: "Authentication failed",
         description: error?.message || "Please check your credentials and try again.",
@@ -119,6 +122,9 @@ export default function AuthForm() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
+              {errorMessage && (
+                <div className="text-sm text-destructive">{errorMessage}</div>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...</> : "Login"}
               </Button>
@@ -155,6 +161,9 @@ export default function AuthForm() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
+              {errorMessage && (
+                <div className="text-sm text-destructive">{errorMessage}</div>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : "Create account"}
               </Button>
