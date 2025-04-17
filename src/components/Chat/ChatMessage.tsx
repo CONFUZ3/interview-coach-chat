@@ -190,7 +190,8 @@ function extractResumePreviewFromLatex(latexCode: string): string {
     if (line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
       const match = line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
       if (match) {
-        const [_, date, role, company, location, _, description] = match;
+        // Fix: use different variable names for unused values
+        const [unused1, date, role, company, location, unused2, description] = match;
         sections.push(`### ${role} at ${company}`);
         sections.push(`${date} | ${location}`);
         if (description && description !== "{}") {

@@ -42,7 +42,13 @@ function generateBasicPDF(resumeContent: string, profileData: ProfileData): Blob
     .replace(/\*/g, '')   // Remove italic markdown
     .replace(/STAR technique/gi, '') // Remove STAR mentions
     .replace(/\\textbf\{([^}]+)\}/g, "$1") // Clean LaTeX formatting
-    .replace(/\\textit\{([^}]+)\}/g, "$1");
+    .replace(/\\textit\{([^}]+)\}/g, "$1")
+    .replace(/Using the STAR format/gi, '') // Additional STAR mention cleanup
+    .replace(/Situation, Task, Action, Result/gi, '')
+    .replace(/Situation:/gi, '')
+    .replace(/Task:/gi, '')
+    .replace(/Action:/gi, '')
+    .replace(/Result:/gi, '');
   
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");

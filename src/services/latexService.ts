@@ -40,7 +40,8 @@ function generateBasicPDF(latexCode: string): Blob {
   const content = extractContentFromLatex(latexCode);
   const parsedContent = parseLatexContent(latexCode);
   
-  if (parsedContent.name) {
+  // Fix: Add type check for the name property
+  if (parsedContent.name !== undefined) {
     // Use the parsed content for better formatting
     doc.setFontSize(24);
     doc.setFont("helvetica", "bold");
@@ -48,7 +49,8 @@ function generateBasicPDF(latexCode: string): Blob {
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    if (parsedContent.contact) {
+    // Fix: Add type check for the contact property
+    if (parsedContent.contact !== undefined) {
       doc.text(parsedContent.contact, 105, 30, { align: "center" });
     }
     
@@ -142,6 +144,8 @@ function parseLatexContent(latexCode: string): {
   sections: { title: string; items: string[] }[];
 } {
   const result = {
+    name: undefined as string | undefined,
+    contact: undefined as string | undefined,
     sections: [] as { title: string; items: string[] }[]
   };
   
