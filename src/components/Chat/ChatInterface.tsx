@@ -1,7 +1,6 @@
 
 import ChatInputArea from "./ChatInputArea";
 import MessageList from "./MessageList";
-import ResumeActions from "./ResumeActions";
 import { useChat } from "@/hooks/useChat";
 
 export type MessageType = {
@@ -11,7 +10,7 @@ export type MessageType = {
   timestamp: Date;
   isTyping?: boolean;
   category?: "general" | "resume" | "interview";
-  format?: "text" | "resume" | "feedback" | "latex";
+  format?: "text" | "feedback";
 };
 
 interface ChatInterfaceProps {
@@ -22,15 +21,9 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
   const {
     messages,
     isProcessing,
-    lastGeneratedResume,
-    lastGeneratedLatex,
     conversationId,
     handleMessageSubmit,
     copyToClipboard,
-    downloadAsText,
-    downloadAsPDF,
-    downloadLatexSource,
-    handleResumeUpload
   } = useChat(mode);
 
   return (
@@ -38,31 +31,17 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
       <MessageList 
         messages={messages} 
         onCopyMessage={copyToClipboard}
-        onDownloadMessage={(content) => 
-          downloadAsPDF(content, !!lastGeneratedLatex)
-        }
-        onDownloadLatex={lastGeneratedLatex ? 
-          (content) => downloadLatexSource(content) : undefined}
+        onDownloadMessage={() => {}}
       />
       
       <div className="p-4 border-t">
-        {mode === "resume" && (
-          <ResumeActions 
-            hasResume={!!lastGeneratedResume || !!lastGeneratedLatex} 
-            isLatex={!!lastGeneratedLatex}
-            onDownloadPDF={() => downloadAsPDF(lastGeneratedLatex || lastGeneratedResume || "", !!lastGeneratedLatex)}
-            onDownloadLatex={lastGeneratedLatex ? () => downloadLatexSource(lastGeneratedLatex) : undefined}
-            onUploadResume={handleResumeUpload}
-          />
-        )}
-        
         <ChatInputArea 
           onSubmit={handleMessageSubmit}
           isProcessing={isProcessing}
           disabled={!conversationId}
           placeholder={mode === "resume" 
-            ? "Describe the job you're applying for..." 
-            : "Type your interview response..."}
+            ? "Ask for career advice or resume tips..." 
+            : "Type your interview question..."}
         />
       </div>
     </div>

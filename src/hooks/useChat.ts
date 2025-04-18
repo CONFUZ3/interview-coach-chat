@@ -5,14 +5,10 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
-  generateResumeWithAI, 
   createConversation, 
   saveMessage, 
-  saveResume, 
   getUserProfile,
-  generatePDF
 } from "@/services/resumeService";
-import { downloadLatexSource as downloadLatex } from "@/services/latexService";
 import type { MessageType } from "@/components/Chat/ChatInterface";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
@@ -21,9 +17,6 @@ export function useChat(mode: "resume" | "interview") {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [lastGeneratedResume, setLastGeneratedResume] = useState<string | null>(null);
-  const [lastGeneratedLatex, setLastGeneratedLatex] = useState<string | null>(null);
-  const [previousResume, setPreviousResume] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -94,7 +87,7 @@ export function useChat(mode: "resume" | "interview") {
     const initialMessage: MessageType = {
       id: generateId(),
       content: mode === "resume" 
-        ? "Hello! I'm your AI resume builder. To generate a professional LaTeX resume, please provide a job description and I'll create a customized resume based on your profile information. You can upload a previous resume as reference and download your new resume as a PDF or LaTeX file when it's ready."
+        ? "Hello! I'm your AI career coach. I can help with resume advice, interview preparation, career transitions, and more. What career guidance can I provide for you today?"
         : "Hello! I'm your AI interview coach. To start a mock interview, please provide a job description and I'll simulate an interview for that position.",
       type: "ai",
       timestamp: new Date(),
@@ -115,114 +108,6 @@ export function useChat(mode: "resume" | "interview") {
     toast({
       title: "Copied to clipboard",
       description: "Content has been copied to your clipboard.",
-    });
-  };
-
-  const downloadAsText = (content: string, filename: string) => {
-    const element = document.createElement("a");
-    const file = new Blob([content], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = filename;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    
-    toast({
-      title: "Download started",
-      description: `${filename} is being downloaded.`,
-    });
-  };
-
-  const downloadAsPDF = async (content: string, isLatex: boolean = false) => {
-    if (!content) {
-      toast({
-        title: "No resume to download",
-        description: "Please generate a resume first before downloading as PDF.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    try {
-      const profile = await getUserProfile();
-      if (!profile) {
-        toast({
-          title: "Profile information missing",
-          description: "Please complete your profile information before downloading a PDF.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const pdfBlob = await generatePDF(content, profile, isLatex);
-      
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      const element = document.createElement("a");
-      element.href = pdfUrl;
-      element.download = `${profile.fullName.replace(/\s+/g, '_')}_resume_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-      
-      toast({
-        title: "PDF download started",
-        description: "Your customized resume is being downloaded as a PDF file.",
-      });
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({
-        title: "PDF Generation Error",
-        description: "There was a problem generating your PDF. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const downloadLatexSource = (latexCode: string) => {
-    if (!latexCode) {
-      toast({
-        title: "No LaTeX source available",
-        description: "Please generate a LaTeX resume first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    getUserProfile().then(profile => {
-      if (!profile) {
-        toast({
-          title: "Profile information missing",
-          description: "Please complete your profile information.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const filename = `${profile.fullName.replace(/\s+/g, '_')}_resume_${new Date().toISOString().split('T')[0]}.tex`;
-      downloadLatex(latexCode, filename);
-      
-      toast({
-        title: "LaTeX source download started",
-        description: "Your LaTeX source code is being downloaded.",
-      });
-    }).catch(error => {
-      console.error("Error getting profile:", error);
-      toast({
-        title: "Error",
-        description: "Failed to download LaTeX source. Please try again.",
-        variant: "destructive",
-      });
-    });
-  };
-
-  const handleResumeUpload = (resumeText: string) => {
-    if (!resumeText) return;
-    
-    setPreviousResume(resumeText);
-    
-    toast({
-      title: "Resume uploaded",
-      description: "Your previous resume will be used as reference for generating new resumes.",
     });
   };
 
@@ -257,65 +142,37 @@ export function useChat(mode: "resume" | "interview") {
     try {
       if (mode === "resume") {
         const profile = await getUserProfile();
-        if (!profile || !profile.fullName) {
-          setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
-          
-          const noProfileMessage: MessageType = {
-            id: generateId(),
-            content: "I notice that your profile information is incomplete. To create the best resume, please complete your profile first. Go to the Profile page to add your education, experience, and skills.",
-            type: "ai",
-            timestamp: new Date(),
-            category: "general"
-          };
-          
-          setMessages(prev => [...prev, noProfileMessage]);
-          await saveMessage(conversationId, noProfileMessage);
-          setIsProcessing(false);
-          return;
-        }
         
-        const result = await generateResumeWithAI(messageContent, previousResume || undefined);
+        // Generate career coaching response
+        let aiResponse = "";
+        
+        if (messageContent.toLowerCase().includes("resume") || messageContent.toLowerCase().includes("cv")) {
+          aiResponse = "When improving your resume, focus on quantifiable achievements rather than just listing duties. Use the STAR method (Situation, Task, Action, Result) to highlight your impact. Tailor your resume for each job application by matching keywords from the job description. What specific part of your resume would you like help with?";
+        } else if (messageContent.toLowerCase().includes("interview")) {
+          aiResponse = "Preparing for interviews involves researching the company, practicing common questions, and preparing your own questions to ask. The STAR method is useful here too for structuring answers about your experience. Would you like specific interview tips for your industry or role?";
+        } else if (messageContent.toLowerCase().includes("career change") || messageContent.toLowerCase().includes("transition")) {
+          aiResponse = "Career transitions can be challenging but rewarding. Start by identifying transferable skills from your current role. Consider what additional skills or certifications you might need. Networking is crucial - connect with professionals in your target field. What specific career change are you considering?";
+        } else {
+          aiResponse = "That's a great question about your career development. To provide more tailored advice, could you share a bit more about your current role, experience level, and specific career goals? This will help me give you more relevant guidance.";
+        }
         
         setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
         
-        // Check if we have LaTeX content
-        if (result.resumeLatex) {
-          setLastGeneratedLatex(result.resumeLatex);
-          
-          const aiMessage: MessageType = {
-            id: generateId(),
-            content: result.resumeLatex,
-            type: "ai",
-            timestamp: new Date(),
-            format: "latex"
-          };
-          
-          setMessages(prev => [...prev, aiMessage]);
-          await saveMessage(conversationId, aiMessage);
-        } else {
-          // Fallback to text resume
-          setLastGeneratedResume(result.resumeText);
-          
-          const aiMessage: MessageType = {
-            id: generateId(),
-            content: result.resumeText,
-            type: "ai",
-            timestamp: new Date(),
-            format: "resume"
-          };
-          
-          setMessages(prev => [...prev, aiMessage]);
-          await saveMessage(conversationId, aiMessage);
-        }
+        const aiMessage: MessageType = {
+          id: generateId(),
+          content: aiResponse,
+          type: "ai",
+          timestamp: new Date(),
+          format: "text"
+        };
         
-        if (sessionData?.session?.user) {
-          await saveResume(sessionData.session.user.id, conversationId, result.resumeLatex || result.resumeText);
-        }
+        setMessages(prev => [...prev, aiMessage]);
+        await saveMessage(conversationId, aiMessage);
       } else if (mode === "interview") {
         setMessages(prev => prev.filter(msg => msg.id !== typingIndicatorId));
         
         let aiResponse = "";
-        let responseFormat: "text" | "resume" | "feedback" = "text";
+        let responseFormat: "text" | "feedback" = "text";
         
         if (messageContent.toLowerCase().includes("job description") || messageContent.toLowerCase().includes("position")) {
           aiResponse = "Great! I'll be your interviewer for this mock interview session. Let's get started with the first question:\n\nCan you walk me through your background and how it relates to this position?";
@@ -372,8 +229,6 @@ export function useChat(mode: "resume" | "interview") {
   return {
     messages,
     isProcessing,
-    lastGeneratedResume,
-    lastGeneratedLatex,
     conversationId,
     handleMessageSubmit,
     copyToClipboard: (content: string) => {
@@ -383,22 +238,5 @@ export function useChat(mode: "resume" | "interview") {
         description: "Content has been copied to your clipboard.",
       });
     },
-    downloadAsText: (content: string, filename = "resume.txt") => {
-      const element = document.createElement("a");
-      const file = new Blob([content], { type: 'text/plain' });
-      element.href = URL.createObjectURL(file);
-      element.download = filename;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-      
-      toast({
-        title: "Download started",
-        description: `${filename} is being downloaded.`,
-      });
-    },
-    downloadAsPDF,
-    downloadLatexSource,
-    handleResumeUpload
   };
 }

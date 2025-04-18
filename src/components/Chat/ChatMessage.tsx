@@ -1,28 +1,16 @@
 
 import { Card } from "@/components/ui/card";
-import { Copy, DownloadCloud, FileText } from "lucide-react";
+import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MessageType } from "./ChatInterface";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEffect, useState } from "react";
 
 interface ChatMessageProps {
   message: MessageType;
   onCopy?: (content: string) => void;
-  onDownload?: (content: string) => void;
-  onDownloadLatex?: (content: string) => void;
 }
 
-export default function ChatMessage({ message, onCopy, onDownload, onDownloadLatex }: ChatMessageProps) {
-  const [resumePreview, setResumePreview] = useState<string>("");
-
-  useEffect(() => {
-    if (message.format === "latex") {
-      setResumePreview(extractResumePreviewFromLatex(message.content));
-    }
-  }, [message.content, message.format]);
-
+export default function ChatMessage({ message, onCopy }: ChatMessageProps) {
   if (message.isTyping) {
     return (
       <div className="flex justify-start mb-4">
@@ -38,56 +26,18 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
   }
 
   const isAI = message.type === "ai";
-  const isResume = message.format === "resume";
-  const isLatex = message.format === "latex";
   const isFeedback = message.format === "feedback";
 
   return (
     <div className={`flex ${isAI ? "justify-start" : "justify-end"} mb-4`}>
       <Card className={isAI ? "chat-message-ai" : "chat-message-user"}>
         <div className="flex justify-between items-start">
-          <div className={`${isResume || isFeedback ? "prose prose-sm dark:prose-invert max-w-none" : ""}`}>
-            {isLatex ? (
-              <Tabs defaultValue="preview">
-                <TabsList className="mb-2">
-                  <TabsTrigger value="preview">Preview</TabsTrigger>
-                  <TabsTrigger value="source">LaTeX Source</TabsTrigger>
-                </TabsList>
-                <TabsContent value="preview" className="prose prose-sm dark:prose-invert max-w-none">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      LaTeX resume generated successfully. Use the download buttons to get your formatted resume.
-                    </p>
-                    <div className="text-xs p-2 bg-muted rounded-md max-h-60 overflow-auto">
-                      {resumePreview.split('\n').map((line, index) => {
-                        if (line.startsWith('## ')) {
-                          return <h2 key={index} className="text-sm font-bold mt-2">{line.replace('## ', '')}</h2>;
-                        } else if (line.startsWith('### ')) {
-                          return <h3 key={index} className="text-xs font-semibold">{line.replace('### ', '')}</h3>;
-                        } else if (line.startsWith('- ')) {
-                          return <div key={index} className="ml-2">• {line.replace('- ', '')}</div>;
-                        } else {
-                          return <div key={index}>{line}</div>;
-                        }
-                      })}
-                    </div>
-                  </div>
-                </TabsContent>
-                <TabsContent value="source">
-                  <pre className="text-xs p-2 bg-muted rounded-md max-h-60 overflow-auto whitespace-pre-wrap font-mono">
-                    {message.content}
-                  </pre>
-                </TabsContent>
-              </Tabs>
-            ) : isResume ? (
-              <div dangerouslySetInnerHTML={{ __html: message.content.replace(/\n/g, "<br>") }} />
-            ) : (
-              message.content.split("\n").map((line, index) => (
-                <p key={index} className={`${index > 0 ? "mt-2" : ""} ${isFeedback ? "italic text-amber-600 dark:text-amber-400" : ""}`}>
-                  {line}
-                </p>
-              ))
-            )}
+          <div className={`${isFeedback ? "prose prose-sm dark:prose-invert max-w-none" : ""}`}>
+            {message.content.split("\n").map((line, index) => (
+              <p key={index} className={`${index > 0 ? "mt-2" : ""} ${isFeedback ? "italic text-amber-600 dark:text-amber-400" : ""}`}>
+                {line}
+              </p>
+            ))}
           </div>
           
           {isAI && message.content.length > 20 && (
@@ -109,48 +59,6 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              
-              {(isResume || isLatex) && (
-                <>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => onDownload?.(message.content)} 
-                          className="h-8 w-8"
-                        >
-                          <DownloadCloud className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Download as PDF</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  
-                  {isLatex && onDownloadLatex && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => onDownloadLatex?.(message.content)} 
-                            className="h-8 w-8"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Download LaTeX source</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </>
-              )}
             </div>
           )}
         </div>
@@ -161,90 +69,4 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
       </Card>
     </div>
   );
-}
-
-// Helper function to extract meaningful content from LaTeX for preview
-function extractResumePreviewFromLatex(latexCode: string): string {
-  if (!latexCode) return "No LaTeX content available";
-  
-  // Extract sections and content for a basic preview
-  const sections: string[] = [];
-  let inDocument = false;
-  
-  latexCode.split('\n').forEach(line => {
-    if (line.includes('\\begin{document}')) {
-      inDocument = true;
-      return;
-    }
-    
-    if (line.includes('\\end{document}')) {
-      inDocument = false;
-      return;
-    }
-    
-    if (!inDocument) return;
-    
-    // Detect sections
-    if (line.match(/\\section\{([^}]+)\}/)) {
-      const sectionName = line.match(/\\section\{([^}]+)\}/)?.[1];
-      if (sectionName) {
-        sections.push(`## ${sectionName}`);
-      }
-      return;
-    }
-    
-    // Detect subsections
-    if (line.match(/\\subsection\{([^}]+)\}/)) {
-      const subsectionName = line.match(/\\subsection\{([^}]+)\}/)?.[1];
-      if (subsectionName) {
-        sections.push(`### ${subsectionName}`);
-      }
-      return;
-    }
-    
-    // Detect resumeSubheading
-    if (line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
-      const match = line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
-      if (match) {
-        const [_, title, date, organization, location] = match;
-        sections.push(`### ${title}`);
-        sections.push(`${organization} | ${location} | ${date}`);
-      }
-      return;
-    }
-    
-    // Detect items
-    if (line.match(/\\item\s/) || line.match(/\\resumeItem\{([^}]+)\}/)) {
-      let itemText = "";
-      
-      if (line.match(/\\resumeItem\{([^}]+)\}/)) {
-        itemText = line.match(/\\resumeItem\{([^}]+)\}/)?.[1] || "";
-      } else {
-        itemText = line.replace(/\\item\s+/, "");
-      }
-      
-      itemText = itemText.replace(/\\textbf\{([^}]+)\}/g, "$1")
-                         .replace(/\\textit\{([^}]+)\}/g, "$1")
-                         .trim();
-                         
-      if (itemText) {
-        sections.push(`- ${itemText}`);
-      }
-      return;
-    }
-    
-    // Clean up some LaTeX commands for better preview
-    const cleanedLine = line
-      .replace(/\\textbf\{([^}]+)\}/g, "$1")
-      .replace(/\\textit\{([^}]+)\}/g, "$1")
-      .replace(/\\\\/, "")
-      .replace(/\\href\{([^}]+)\}\{([^}]+)\}/g, "$2 ($1)")
-      .trim();
-      
-    if (cleanedLine.length > 0 && !cleanedLine.startsWith("\\")) {
-      sections.push(cleanedLine);
-    }
-  });
-  
-  return sections.join('\n') || "Unable to extract preview from LaTeX";
 }

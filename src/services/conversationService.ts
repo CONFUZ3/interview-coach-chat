@@ -27,7 +27,6 @@ export async function createConversation() {
 
 export async function saveMessage(conversationId: string, message: MessageType) {
   try {
-    // The format field is nullable, so we don't need to include it if not provided
     const messageData = {
       conversation_id: conversationId,
       type: message.type,
@@ -51,28 +50,6 @@ export async function saveMessage(conversationId: string, message: MessageType) 
     return true;
   } catch (error) {
     console.error("Failed to save message:", error);
-    throw error;
-  }
-}
-
-export async function saveResume(userId: string, conversationId: string, content: string) {
-  try {
-    const { error } = await supabase
-      .from('resumes')
-      .insert({
-        user_id: userId,
-        conversation_id: conversationId,
-        content: content
-      });
-    
-    if (error) {
-      console.error("Error saving resume:", error);
-      throw error;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error("Failed to save resume:", error);
     throw error;
   }
 }
