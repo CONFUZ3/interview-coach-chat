@@ -65,6 +65,33 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          resume_text: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          email?: string | null
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          resume_text?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          resume_text?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       resumes: {
         Row: {
           company: string | null

@@ -5,7 +5,6 @@ export interface ProfileData {
   fullName: string;
   email: string;
   phone: string;
-  resumeFile?: File | null;
   resumeText?: string;
 }
 
@@ -17,19 +16,16 @@ export async function getUserProfile(): Promise<ProfileData | null> {
       return null;
     }
     
-    const userId = sessionData.session.user.id;
-    
     // Try to get profile from Supabase
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', userId)
+      .eq('id', sessionData.session.user.id)
       .single();
     
-    if (error && error.code !== 'PGRST116') { // PGRST116 is the "no rows returned" error
+    if (error) {
       console.error("Error fetching profile:", error);
-      // Fall back to localStorage
-      return getProfileFromLocalStorage();
+      return null;
     }
     
     if (data) {
@@ -41,55 +37,33 @@ export async function getUserProfile(): Promise<ProfileData | null> {
       };
     }
     
-    // If no data in Supabase, try localStorage
-    return getProfileFromLocalStorage();
+    return null;
   } catch (error) {
     console.error("Failed to fetch profile data:", error);
-    return getProfileFromLocalStorage();
+    return null;
   }
-}
-
-function getProfileFromLocalStorage(): ProfileData | null {
-  const savedProfile = localStorage.getItem("careerAI-profile");
-  if (savedProfile) {
-    try {
-      return JSON.parse(savedProfile);
-    } catch (error) {
-      console.error("Failed to parse profile data from localStorage", error);
-    }
-  }
-  return null;
 }
 
 export async function saveUserProfile(profileData: ProfileData): Promise<boolean> {
   try {
-    // Save to localStorage as backup
-    localStorage.setItem("careerAI-profile", JSON.stringify(profileData));
-    
-    // Get current user
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session?.user) {
       return false;
     }
     
-    const userId = sessionData.session.user.id;
-    
-    // Save to Supabase
     const { error } = await supabase
       .from('profiles')
       .upsert({
-        id: userId,
+        id: sessionData.session.user.id,
         full_name: profileData.fullName,
         email: profileData.email,
         phone: profileData.phone,
         resume_text: profileData.resumeText,
         updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'id'
       });
     
     if (error) {
-      console.error("Error saving profile to Supabase:", error);
+      console.error("Error saving profile:", error);
       return false;
     }
     

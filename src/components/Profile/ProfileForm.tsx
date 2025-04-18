@@ -1,69 +1,28 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { getUserProfile, saveUserProfile, ProfileData } from "@/services/profileService";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, FileText } from "lucide-react";
+import { Upload } from "lucide-react";
+import { getUserProfile, saveUserProfile, ProfileData } from "@/services/profileService";
 
 export default function ProfileForm() {
   const [profile, setProfile] = useState<ProfileData>({
     fullName: "",
     email: "",
     phone: "",
-    resumeText: ""
   });
   
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  // Load profile data when component mounts
-  useEffect(() => {
-    const loadProfile = async () => {
-      const loadedProfile = await getUserProfile();
-      if (loadedProfile) {
-        setProfile(loadedProfile);
-      }
-    };
-    
-    loadProfile();
-  }, []);
-
-  const handleSaveProfile = async () => {
-    setIsLoading(true);
-    try {
-      const success = await saveUserProfile(profile);
-      
-      if (success) {
-        toast({
-          title: "Profile saved",
-          description: "Your profile has been updated successfully.",
-        });
-      } else {
-        toast({
-          title: "Error saving profile",
-          description: "There was an error saving your profile to the database, but it has been saved locally.",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error saving profile",
-        description: "There was an error saving your profile. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
@@ -82,7 +41,7 @@ export default function ProfileForm() {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/msword',
       'application/x-latex',
-      'application/octet-stream' // For .tex files sometimes
+      'application/octet-stream'
     ];
     
     const fileExt = file.name.split('.').pop()?.toLowerCase();
@@ -93,19 +52,10 @@ export default function ProfileForm() {
       return;
     }
     
-    // Check file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError("File size should be less than 10MB");
-      return;
-    }
-    
     setIsUploading(true);
-    setResumeFile(file);
     
     try {
-      // For text-based files, we can extract content directly
-      if (file.type === 'text/plain' || file.type === 'application/x-latex' || 
-          fileExt === 'tex' || fileExt === 'txt') {
+      if (file.type === 'text/plain' || fileExt === 'txt' || fileExt === 'tex') {
         const text = await file.text();
         setProfile(prev => ({
           ...prev,
@@ -113,18 +63,11 @@ export default function ProfileForm() {
         }));
         setUploadStatus(`Resume uploaded: ${file.name}`);
       } else {
-        // For other files, just store the filename
         setProfile(prev => ({
           ...prev,
           resumeText: `Previous resume uploaded: ${file.name}`
         }));
         setUploadStatus(`Resume uploaded: ${file.name}`);
-        
-        if (file.type === 'application/pdf' || fileExt === 'pdf') {
-          setUploadStatus("PDF resume uploaded. The AI will extract content during resume generation.");
-        } else {
-          setUploadStatus(`Resume uploaded: ${file.name}. The AI will use this as reference.`);
-        }
       }
     } catch (error) {
       console.error("Error reading file:", error);
@@ -134,12 +77,41 @@ export default function ProfileForm() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    setIsLoading(true);
+    try {
+      const success = await saveUserProfile(profile);
+      
+      if (success) {
+        toast({
+          title: "Profile saved",
+          description: "Your profile has been updated successfully.",
+        });
+        navigate("/resume");
+      } else {
+        toast({
+          title: "Error saving profile",
+          description: "There was an error saving your profile. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error saving profile",
+        description: "There was an error saving your profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <Card className="w-full max-w-4xl">
+    <Card className="w-full max-w-xl">
       <CardHeader>
-        <CardTitle>Professional Profile</CardTitle>
+        <CardTitle>Profile Information</CardTitle>
         <CardDescription>
-          Update your basic information and upload your existing resume to optimize AI-generated resumes.
+          Enter your basic information and upload your existing resume to get started.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -177,63 +149,47 @@ export default function ProfileForm() {
           </div>
         </div>
         
-        <div className="space-y-4 border-t pt-4">
-          <h3 className="font-medium">Upload Resume</h3>
-          <p className="text-sm text-muted-foreground">
-            Upload your existing resume to help the AI generate better tailored resumes for your job applications.
-          </p>
-          
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Input
-                type="file"
-                accept=".pdf,.doc,.docx,.txt,.tex"
-                id="resume-upload"
-                className="hidden"
-                onChange={handleFileUpload}
-                disabled={isUploading}
-              />
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => document.getElementById("resume-upload")?.click()}
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <>
-                    <Spinner className="mr-2 h-4 w-4" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Previous Resume
-                  </>
-                )}
-              </Button>
-            </div>
-            
-            {profile.resumeText && !uploadStatus && !uploadError && (
-              <Alert className="mt-2 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-                <FileText className="h-4 w-4 text-green-700 dark:text-green-400 mr-2" />
-                <AlertDescription className="text-green-700 dark:text-green-400">
-                  Resume content is already loaded
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {uploadStatus && (
-              <Alert className="mt-2 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-                <AlertDescription className="text-green-700 dark:text-green-400">{uploadStatus}</AlertDescription>
-              </Alert>
-            )}
-            
-            {uploadError && (
-              <Alert variant="destructive" className="mt-2">
-                <AlertDescription>{uploadError}</AlertDescription>
-              </Alert>
-            )}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.tex"
+              id="resume-upload"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+            />
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => document.getElementById("resume-upload")?.click()}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Previous Resume
+                </>
+              )}
+            </Button>
           </div>
+          
+          {uploadStatus && (
+            <Alert className="mt-2 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+              <AlertDescription className="text-green-700 dark:text-green-400">{uploadStatus}</AlertDescription>
+            </Alert>
+          )}
+          
+          {uploadError && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertDescription>{uploadError}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </CardContent>
       <CardFooter>
