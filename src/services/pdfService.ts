@@ -2,26 +2,19 @@
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import type { ProfileData } from "./profileService";
-import { compileLatexToPDF } from "./latexService";
 
 export async function generatePDF(resumeContent: string, profileData: ProfileData, isLatex: boolean = false): Promise<Blob> {
   try {
-    if (isLatex) {
-      // If it's LaTeX content, use the LaTeX compiler
-      console.log("Generating PDF from LaTeX content");
-      return await compileLatexToPDF(resumeContent);
-    } else {
-      console.log("Generating basic PDF from text content");
-      return generateBasicPDF(resumeContent, profileData);
-    }
+    // For all resumes, we'll use our basic PDF generator
+    // The LaTeX content will be formatted more nicely than plain text
+    return generateBasicPDF(resumeContent, profileData, isLatex);
   } catch (error) {
     console.error("Error generating PDF:", error);
-    // Fall back to basic PDF if there's any error
-    return generateBasicPDF(resumeContent, profileData);
+    return generateBasicPDF(resumeContent, profileData, false);
   }
 }
 
-function generateBasicPDF(resumeContent: string, profileData: ProfileData): Blob {
+function generateBasicPDF(resumeContent: string, profileData: ProfileData, isLatex: boolean = false): Blob {
   const doc = new jsPDF();
   
   try {
@@ -42,19 +35,19 @@ function generateBasicPDF(resumeContent: string, profileData: ProfileData): Blob
     doc.setLineWidth(0.5);
     doc.line(20, 32, 190, 32);
     
-    // Resume content - clean up any markup or non-printable characters
-    const cleanedContent = resumeContent
-      .replace(/\*\*/g, '') // Remove bold markdown
-      .replace(/\*/g, '')   // Remove italic markdown
-      .replace(/STAR technique/gi, '') // Remove STAR mentions
-      .replace(/\\textbf\{([^}]+)\}/g, "$1") // Clean LaTeX formatting
-      .replace(/\\textit\{([^}]+)\}/g, "$1")
-      .replace(/Using the STAR format/gi, '') // Additional STAR mention cleanup
-      .replace(/Situation, Task, Action, Result/gi, '')
-      .replace(/Situation:/gi, '')
-      .replace(/Task:/gi, '')
-      .replace(/Action:/gi, '')
-      .replace(/Result:/gi, '');
+    // Clean up any LaTeX markup or non-printable characters
+    let cleanedContent = resumeContent;
+    
+    if (isLatex) {
+      cleanedContent = cleanLaTeXContent(resumeContent);
+    } else {
+      // Just remove some basic markdown
+      cleanedContent = resumeContent
+        .replace(/\*\*/g, '') // Remove bold markdown
+        .replace(/\*/g, '')   // Remove italic markdown
+        .replace(/STAR technique/gi, '') // Remove STAR mentions
+        .replace(/Using the STAR format/gi, ''); // Additional STAR mention cleanup
+    }
     
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
@@ -98,4 +91,37 @@ function generateBasicPDF(resumeContent: string, profileData: ProfileData): Blob
     doc.text("Please try again or use the LaTeX source option", 20, 30);
     return doc.output("blob");
   }
+}
+
+// Helper function to extract just the text content from LaTeX
+function cleanLaTeXContent(latexCode: string): string {
+  // Basic initial cleanup
+  let content = latexCode
+    .replace(/\\textbf\{([^}]+)\}/g, "$1") // Remove \textbf
+    .replace(/\\textit\{([^}]+)\}/g, "$1") // Remove \textit
+    .replace(/\\\\+/g, "\n") // Replace \\ with newlines
+    .replace(/\\begin\{document\}([\s\S]*?)\\end\{document\}/g, "$1") // Extract content between begin/end document
+    .replace(/\\section\{([^}]+)\}/g, "\n\n$1\n") // Sections to plain text
+    .replace(/\\subsection\{([^}]+)\}/g, "\n$1\n") // Subsections to plain text
+    .replace(/\\begin\{itemize\}([\s\S]*?)\\end\{itemize\}/g, "$1") // Remove itemize environment
+    .replace(/\\begin\{enumerate\}([\s\S]*?)\\end\{enumerate\}/g, "$1") // Remove enumerate environment
+    .replace(/\\item\s*/g, "\n• ") // Item to bullet points
+    .replace(/\\documentclass.*?\{.*?\}/g, "") // Remove document class
+    .replace(/\\usepackage.*?\{.*?\}/g, "") // Remove packages
+    .replace(/\\maketitle/g, "") // Remove title command
+    .replace(/\\begin\{center\}([\s\S]*?)\\end\{center\}/g, "$1") // Remove center environment
+    .replace(/\\href\{([^}]+)\}\{([^}]+)\}/g, "$2 ($1)") // Convert hyperlinks
+    .replace(/\{|\}/g, "") // Remove any remaining braces
+    .replace(/\\\w+(\[.*?\])?(\{.*?\})?/g, "") // Remove other LaTeX commands
+    .replace(/\n\s*\n\s*\n/g, "\n\n") // Normalize spacing
+    .trim();
+  
+  // Additional cleaning
+  content = content
+    .replace(/\n +/g, "\n") // Remove leading spaces after newlines
+    .replace(/\\documentclass[^]*?\\begin\{document\}/s, "") // Remove preamble
+    .replace(/\\end\{document\}[^]*/s, "") // Remove anything after \end{document}
+    .trim();
+
+  return content;
 }

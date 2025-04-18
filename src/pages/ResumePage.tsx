@@ -32,7 +32,7 @@ const ResumePage = () => {
           </AlertDescription>
         </Alert>
         
-        <Card className="mb-4 bg-accent/50">
+        <Card className="mb-2 bg-accent/50">
           <CardContent className="py-2">
             <CardDescription className="flex flex-wrap justify-between gap-2 text-xs">
               <div className="flex items-center">

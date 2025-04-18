@@ -41,46 +41,13 @@ serve(async (req) => {
     }
 
     // Format basic user information - allow using just uploaded resume instead of full profile
-    let fullName = "Your Name";
-    let email = "email@example.com";
-    let phone = "(123) 456-7890";
-    let profileText = "Resume information will be extracted from your uploaded document";
+    let fullName = userProfile?.fullName || "Your Name";
+    let email = userProfile?.email || "email@example.com";
+    let phone = userProfile?.phone || "(123) 456-7890";
     
-    if (userProfile && userProfile.fullName) {
-      fullName = userProfile.fullName;
-      email = userProfile.email || email;
-      phone = userProfile.phone || phone;
-      
-      // Format user profile if available
-      if (userProfile.education || userProfile.experience || userProfile.skills) {
-        const { education, experience, skills } = userProfile;
-        
-        const educationText = education && education.length > 0
-          ? education.map(edu => `${edu.degree} from ${edu.institution}, ${edu.graduationDate}`).join("\n")
-          : "No education information provided";
-        
-        const experienceText = experience && experience.length > 0
-          ? experience.map(exp => 
-            `${exp.position} at ${exp.company}, ${exp.startDate} to ${exp.endDate}\n${exp.description}`
-          ).join("\n\n")
-          : "No work experience provided";
-        
-        const skillsText = skills && skills.length > 0
-          ? skills.join(", ")
-          : "No skills provided";
-        
-        profileText = `
-Education:
-${educationText}
-
-Work Experience:
-${experienceText}
-
-Skills:
-${skillsText}`;
-      }
-    }
-
+    // Set up profile text from the previous resume or minimal profile info
+    let profileText = previousResume || "Minimal profile information provided";
+    
     // LaTeX template for article class (ATS-friendly)
     const latexTemplate = `
 \\documentclass[a4paper,12pt]{article}
@@ -166,7 +133,7 @@ ${skillsText}`;
 \\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
 `;
 
-    // Improved LaTeX-focused prompt for Gemini
+    // Create a conversational prompt for better resume generation
     const prompt = `
 You are an expert LaTeX formatter specializing in professional resumes. Your job is to transform the provided 
 personal information and job description into a structured, well-formatted LaTeX resume.
@@ -196,8 +163,6 @@ ${profileText}
 ### JOB DESCRIPTION:
 ${jobDescription}
 
-${previousResume ? `### PREVIOUS RESUME CONTENT (use this as reference):\n${previousResume}` : ''}
-
 Create a complete, compilable LaTeX document using the provided template above. The document should start with the template, include a proper \\begin{document} after the template, and end with \\end{document}.
 Return ONLY valid LaTeX code.
 
@@ -214,10 +179,10 @@ Structure the resume using article class following this pattern:
 
 %----------HEADING----------
 \\begin{center}
-    \\textbf{\\Huge \\scshape Full Name} \\\\ \\vspace{1pt}
+    \\textbf{\\Huge \\scshape ${fullName}} \\\\ \\vspace{1pt}
     \\small City, State $\\cdot$
-    \\small Phone  $\\cdot$
-    \\small Email
+    \\small ${phone}  $\\cdot$
+    \\small ${email}
     \\linebreak
     \\small LinkedIn
 \\end{center}
@@ -255,7 +220,7 @@ Structure the resume using article class following this pattern:
 
     console.log("Calling Gemini API with prompt");
     
-    // Updated Gemini API endpoint and request format
+    // Call Gemini API with the prompt
     const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -293,12 +258,8 @@ Structure the resume using article class following this pattern:
       latexContent = latexContent.replace(/STAR technique/gi, ''); // Remove any STAR mentions
       latexContent = latexContent.replace(/Using the STAR format/gi, ''); // Additional STAR mention cleanup
       latexContent = latexContent.replace(/Situation, Task, Action, Result/gi, '');
-      latexContent = latexContent.replace(/Situation:/gi, '');
-      latexContent = latexContent.replace(/Task:/gi, '');
-      latexContent = latexContent.replace(/Action:/gi, '');
-      latexContent = latexContent.replace(/Result:/gi, '');
       
-      // If the response doesn't start with \documentclass, extract only the LaTeX portion
+      // Extract only the LaTeX portion if needed
       if (!latexContent.trim().startsWith("\\documentclass")) {
         const match = latexContent.match(/\\documentclass.*?\\end{document}/s);
         if (match) {

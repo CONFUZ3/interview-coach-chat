@@ -9,9 +9,9 @@ import { useEffect, useState } from "react";
 
 interface ChatMessageProps {
   message: MessageType;
-  onCopy?: (content: string) => void;
-  onDownload?: (content: string) => void;
-  onDownloadLatex?: (content: string) => void;
+  onCopy?: () => void;
+  onDownload?: () => void;
+  onDownloadLatex?: () => void;
 }
 
 export default function ChatMessage({ message, onCopy, onDownload, onDownloadLatex }: ChatMessageProps) {
@@ -95,7 +95,7 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => onCopy?.(message.content)} className="h-8 w-8">
+                    <Button variant="ghost" size="icon" onClick={onCopy} className="h-8 w-8">
                       <Copy className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -110,7 +110,7 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => onDownload?.(message.content)} className="h-8 w-8">
+                        <Button variant="ghost" size="icon" onClick={onDownload} className="h-8 w-8">
                           <DownloadCloud className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -124,7 +124,7 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => onDownloadLatex(message.content)} className="h-8 w-8">
+                          <Button variant="ghost" size="icon" onClick={onDownloadLatex} className="h-8 w-8">
                             <FileText className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -186,12 +186,12 @@ function extractResumePreviewFromLatex(latexCode: string): string {
       return;
     }
     
-    // Detect cventry (for moderncv package) - Fixed the duplicate _ variable issue
+    // Detect cventry (for moderncv package)
     if (line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
       const match = line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
       if (match) {
-        // Fixed variable naming to avoid duplicate "_" variables
-        const [, date, role, company, location, extra, description] = match;
+        // Use different variable names for each captured group to avoid duplication
+        const [fullMatch, date, role, company, location, extraField, description] = match;
         sections.push(`### ${role} at ${company}`);
         sections.push(`${date} | ${location}`);
         if (description && description !== "{}") {
@@ -202,12 +202,31 @@ function extractResumePreviewFromLatex(latexCode: string): string {
       return;
     }
     
+    // Detect resumeSubheading
+    if (line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
+      const match = line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
+      if (match) {
+        const [fullMatch, title, date, organization, location] = match;
+        sections.push(`### ${title}`);
+        sections.push(`${organization} | ${location} | ${date}`);
+      }
+      return;
+    }
+    
     // Detect items
-    if (line.match(/\\item\s/)) {
-      const itemText = line.replace(/\\item\s+/, "")
-                          .replace(/\\textbf\{([^}]+)\}/g, "**$1**")
-                          .replace(/\\textit\{([^}]+)\}/g, "*$1*")
-                          .trim();
+    if (line.match(/\\item\s/) || line.match(/\\resumeItem\{([^}]+)\}/)) {
+      let itemText = "";
+      
+      if (line.match(/\\resumeItem\{([^}]+)\}/)) {
+        itemText = line.match(/\\resumeItem\{([^}]+)\}/)?.[1] || "";
+      } else {
+        itemText = line.replace(/\\item\s+/, "");
+      }
+      
+      itemText = itemText.replace(/\\textbf\{([^}]+)\}/g, "**$1**")
+                         .replace(/\\textit\{([^}]+)\}/g, "*$1*")
+                         .trim();
+                         
       if (itemText) {
         sections.push(`- ${itemText}`);
       }
