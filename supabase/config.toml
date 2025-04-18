@@ -1,5 +1,5 @@
 
 project_id = "fiqyafccamwqluunmara"
 
-[functions.generate-resume]
+[functions.career-chat]
 verify_jwt = true
