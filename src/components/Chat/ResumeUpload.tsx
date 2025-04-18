@@ -59,29 +59,13 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
         onUpload(text);
         setUploadStatus(`Resume uploaded: ${file.name}`);
       } else if (file.type === 'application/pdf' || fileExt === 'pdf') {
-        // For PDFs, we'd ideally use a PDF extraction service
-        // For now, we'll try to extract some basic text content
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          
-          setUploadStatus("Processing PDF file...");
-          onUpload(`Previous resume uploaded: ${file.name} (PDF). Extracting content...`);
-          
-          // You can implement a PDF extraction service or use a third-party API here
-          // For now, we'll just use the filename
-          setUploadStatus(`Resume uploaded: ${file.name}`);
-        } catch (pdfError) {
-          console.error("Error extracting PDF content:", pdfError);
-          onUpload(`Previous resume uploaded: ${file.name} (PDF)`);
-          setUploadStatus(`Resume uploaded: ${file.name}`);
-          setUploadError("Note: For better results with PDF files, consider extracting and pasting the text manually.");
-        }
+        // For PDFs, we just capture the file info
+        onUpload(`Previous resume uploaded: ${file.name} (PDF)`);
+        setUploadStatus(`Resume uploaded: ${file.name}`);
       } else {
         // For DOC/DOCX files
         onUpload(`Previous resume uploaded: ${file.name} (Word document)`);
         setUploadStatus(`Resume uploaded: ${file.name}`);
-        setUploadError("Note: For better results with Word documents, consider extracting and pasting the text manually.");
       }
     } catch (error) {
       console.error("Error reading file:", error);

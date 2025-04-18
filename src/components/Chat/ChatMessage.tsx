@@ -9,9 +9,9 @@ import { useEffect, useState } from "react";
 
 interface ChatMessageProps {
   message: MessageType;
-  onCopy?: () => void;
-  onDownload?: () => void;
-  onDownloadLatex?: () => void;
+  onCopy?: (content: string) => void;
+  onDownload?: (content: string) => void;
+  onDownloadLatex?: (content: string) => void;
 }
 
 export default function ChatMessage({ message, onCopy, onDownload, onDownloadLatex }: ChatMessageProps) {
@@ -95,7 +95,12 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={onCopy} className="h-8 w-8">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => onCopy?.(message.content)} 
+                      className="h-8 w-8"
+                    >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -110,7 +115,12 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={onDownload} className="h-8 w-8">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => onDownload?.(message.content)} 
+                          className="h-8 w-8"
+                        >
                           <DownloadCloud className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -124,7 +134,12 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={onDownloadLatex} className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => onDownloadLatex?.(message.content)} 
+                            className="h-8 w-8"
+                          >
                             <FileText className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -150,10 +165,11 @@ export default function ChatMessage({ message, onCopy, onDownload, onDownloadLat
 
 // Helper function to extract meaningful content from LaTeX for preview
 function extractResumePreviewFromLatex(latexCode: string): string {
+  if (!latexCode) return "No LaTeX content available";
+  
   // Extract sections and content for a basic preview
   const sections: string[] = [];
   let inDocument = false;
-  let currentSection = "";
   
   latexCode.split('\n').forEach(line => {
     if (line.includes('\\begin{document}')) {
@@ -186,27 +202,11 @@ function extractResumePreviewFromLatex(latexCode: string): string {
       return;
     }
     
-    // Detect cventry (for moderncv package)
-    if (line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
-      const match = line.match(/\\cventry\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
-      if (match) {
-        // Use different variable names for each captured group to avoid duplication
-        const [fullMatch, date, role, company, location, extraField, description] = match;
-        sections.push(`### ${role} at ${company}`);
-        sections.push(`${date} | ${location}`);
-        if (description && description !== "{}") {
-          sections.push(description.replace(/\\textbf\{([^}]+)\}/g, "**$1**")
-                               .replace(/\\textit\{([^}]+)\}/g, "*$1*"));
-        }
-      }
-      return;
-    }
-    
     // Detect resumeSubheading
     if (line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/)) {
       const match = line.match(/\\resumeSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}/);
       if (match) {
-        const [fullMatch, title, date, organization, location] = match;
+        const [_, title, date, organization, location] = match;
         sections.push(`### ${title}`);
         sections.push(`${organization} | ${location} | ${date}`);
       }
@@ -223,8 +223,8 @@ function extractResumePreviewFromLatex(latexCode: string): string {
         itemText = line.replace(/\\item\s+/, "");
       }
       
-      itemText = itemText.replace(/\\textbf\{([^}]+)\}/g, "**$1**")
-                         .replace(/\\textit\{([^}]+)\}/g, "*$1*")
+      itemText = itemText.replace(/\\textbf\{([^}]+)\}/g, "$1")
+                         .replace(/\\textit\{([^}]+)\}/g, "$1")
                          .trim();
                          
       if (itemText) {
@@ -235,8 +235,8 @@ function extractResumePreviewFromLatex(latexCode: string): string {
     
     // Clean up some LaTeX commands for better preview
     const cleanedLine = line
-      .replace(/\\textbf\{([^}]+)\}/g, "**$1**")
-      .replace(/\\textit\{([^}]+)\}/g, "*$1*")
+      .replace(/\\textbf\{([^}]+)\}/g, "$1")
+      .replace(/\\textit\{([^}]+)\}/g, "$1")
       .replace(/\\\\/, "")
       .replace(/\\href\{([^}]+)\}\{([^}]+)\}/g, "$2 ($1)")
       .trim();
@@ -246,5 +246,5 @@ function extractResumePreviewFromLatex(latexCode: string): string {
     }
   });
   
-  return sections.join('\n');
+  return sections.join('\n') || "Unable to extract preview from LaTeX";
 }

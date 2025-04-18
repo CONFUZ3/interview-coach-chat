@@ -3,55 +3,76 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MessageType } from "@/components/Chat/ChatInterface";
 
 export async function createConversation() {
-  const { data } = await supabase.auth.getSession();
-  const userId = data?.session?.user?.id;
-  
-  if (!userId) {
-    throw new Error("User must be logged in to create a conversation");
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.user) {
+      throw new Error("Authentication required");
+    }
+    
+    const { data, error } = await supabase
+      .from('conversations')
+      .insert({
+        user_id: sessionData.session.user.id
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Failed to create conversation:", error);
+    throw error;
   }
-  
-  const result = await supabase
-    .from('conversations')
-    .insert([{ user_id: userId }])
-    .select();
-
-  if (result.error) {
-    console.error("Error creating conversation:", result.error);
-    throw result.error;
-  }
-
-  return result.data[0];
 }
 
 export async function saveMessage(conversationId: string, message: MessageType) {
-  const result = await supabase
-    .from('messages')
-    .insert([{
+  try {
+    // The format field is nullable, so we don't need to include it if not provided
+    const messageData = {
       conversation_id: conversationId,
-      content: message.content,
       type: message.type,
-      format: message.format || 'text'
-    }]);
-
-  if (result.error) {
-    console.error("Error saving message:", result.error);
-    throw result.error;
+      content: message.content
+    };
+    
+    // Only add format if it exists
+    if (message.format) {
+      Object.assign(messageData, { format: message.format });
+    }
+    
+    const { error } = await supabase
+      .from('messages')
+      .insert(messageData);
+    
+    if (error) {
+      console.error("Error saving message:", error);
+      throw error;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Failed to save message:", error);
+    throw error;
   }
 }
 
-export async function saveResume(userId: string, conversationId: string, content: string, jobTitle?: string, company?: string) {
-  const result = await supabase
-    .from('resumes')
-    .insert([{
-      user_id: userId,
-      conversation_id: conversationId,
-      content,
-      job_title: jobTitle,
-      company
-    }]);
-
-  if (result.error) {
-    console.error("Error saving resume:", result.error);
-    throw result.error;
+export async function saveResume(userId: string, conversationId: string, content: string) {
+  try {
+    const { error } = await supabase
+      .from('resumes')
+      .insert({
+        user_id: userId,
+        conversation_id: conversationId,
+        content: content
+      });
+    
+    if (error) {
+      console.error("Error saving resume:", error);
+      throw error;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Failed to save resume:", error);
+    throw error;
   }
 }

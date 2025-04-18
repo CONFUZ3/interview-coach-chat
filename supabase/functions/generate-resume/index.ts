@@ -8,6 +8,89 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// LaTeX template based on the provided Python code
+const LATEX_TEMPLATE = `
+\\documentclass[a4paper,12pt]{article}
+\\usepackage{latexsym}
+\\usepackage[empty]{fullpage}
+\\usepackage{titlesec}
+\\usepackage{marvosym}
+\\usepackage[usenames,dvipsnames]{color}
+\\usepackage{verbatim}
+\\usepackage{enumitem}
+\\usepackage[hidelinks]{hyperref}
+\\usepackage{fancyhdr}
+\\usepackage[english]{babel}
+\\usepackage{tabularx}
+\\usepackage[left=0.5in,top=0.6in,right=0.5in,bottom=0.6in]{geometry}
+
+\\urlstyle{same}
+\\raggedbottom
+\\raggedright
+\\setlength{\\tabcolsep}{0in}
+
+\\pagestyle{fancy}
+\\fancyhf{}
+\\renewcommand{\\headrulewidth}{0pt}
+\\renewcommand{\\footrulewidth}{0pt}
+
+% Ensure enough space at the bottom
+\\setlength{\\footskip}{4.5pt}
+
+% Sections formatting
+\\titleformat{\\section}{
+  \\vspace{-4pt}\\scshape\\raggedright\\large
+}{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]
+
+% Custom commands
+\\newcommand{\\resumeItem}[1]{
+  \\item\\small{{#1 \\vspace{-2pt}}}
+}
+\\newcommand{\\resumeSubheading}[4]{
+  \\vspace{-2pt}\\item
+    \\begin{tabular*}{0.97\\textwidth}[t]{l@{\\extracolsep{\\fill}}r}
+      \\textbf{#1} & #2 \\\\
+      \\textit{\\small#3} & \\textit{\\small #4} \\\\
+    \\end{tabular*}\\vspace{-7pt}
+}
+\\newcommand{\\resumeItemListStart}{\\begin{itemize}[leftmargin=0.15in, itemsep=0pt]}
+\\newcommand{\\resumeItemListEnd}{\\end{itemize}}
+`;
+
+// Function to escape special LaTeX characters in user input
+function escapeLatex(text: string): string {
+  if (!text) return "";
+  
+  const latexSpecialChars: {[key: string]: string} = {
+    "&": "\\&", 
+    "%": "\\%", 
+    "$": "\\$", 
+    "#": "\\#",
+    "_": "\\_", 
+    "{": "\\{", 
+    "}": "\\}", 
+    "~": "\\textasciitilde{}",
+    "^": "\\textasciicircum{}", 
+    "\\": "\\textbackslash{}"
+  };
+  
+  // Remove excessive new lines
+  let safeText = text.replace(/\n+/g, '\n');
+  
+  // Escape special characters
+  for (const [char, escape] of Object.entries(latexSpecialChars)) {
+    safeText = safeText.split(char).join(escape);
+  }
+  
+  return safeText.trim();
+}
+
+// Extract only the LaTeX code from LLM response
+function extractLatex(response: string): string | null {
+  const match = response.match(/\\documentclass.*?\\end{document}/s);
+  return match ? match[0] : null;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -48,92 +131,7 @@ serve(async (req) => {
     // Set up profile text from the previous resume or minimal profile info
     let profileText = previousResume || "Minimal profile information provided";
     
-    // LaTeX template for article class (ATS-friendly)
-    const latexTemplate = `
-\\documentclass[a4paper,12pt]{article}
-
-\\usepackage{latexsym}
-\\usepackage[empty]{fullpage}
-\\usepackage{titlesec}
-\\usepackage{marvosym}
-\\usepackage[usenames,dvipsnames]{color}
-\\usepackage{verbatim}
-\\usepackage{enumitem}
-\\usepackage[hidelinks]{hyperref}
-\\usepackage{fancyhdr}
-\\usepackage[english]{babel}
-\\usepackage{tabularx}
-\\usepackage[scale=0.75]{geometry}
-\\input{glyphtounicode}
-
-\\pagestyle{fancy}
-\\fancyhf{} % clear all header and footer fields
-\\fancyfoot{}
-\\renewcommand{\\headrulewidth}{0pt}
-\\renewcommand{\\footrulewidth}{0pt}
-
-% Adjust margins
-\\addtolength{\\oddsidemargin}{-0.5in}
-\\addtolength{\\evensidemargin}{-0.5in}
-\\addtolength{\\textwidth}{1in}
-\\addtolength{\\topmargin}{-.5in}
-\\addtolength{\\textheight}{1.0in}
-
-\\urlstyle{same}
-
-\\raggedbottom
-\\raggedright
-\\setlength{\\tabcolsep}{0in}
-
-% Sections formatting
-\\titleformat{\\section}{
-  \\vspace{-4pt}\\scshape\\raggedright\\large
-}{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]
-
-% Ensure that generate pdf is machine readable/ATS parsable
-\\pdfgentounicode=1
-
-%-------------------------
-% Custom commands
-\\newcommand{\\resumeItem}[1]{
-  \\item\\small{
-    {#1 \\vspace{-2pt}}
-  }
-}
-
-\\newcommand{\\resumeSubheading}[4]{
-  \\vspace{-2pt}\\item
-    \\begin{tabular*}{0.97\\textwidth}[t]{l@{\\extracolsep{\\fill}}r}
-      \\textbf{#1} & #2 \\\\
-      \\textit{\\small#3} & \\textit{\\small #4} \\\\
-    \\end{tabular*}\\vspace{-7pt}
-}
-
-\\newcommand{\\resumeSubSubheading}[2]{
-    \\item
-    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
-      \\textit{\\small#1} & \\textit{\\small #2} \\\\
-    \\end{tabular*}\\vspace{-7pt}
-}
-
-\\newcommand{\\resumeProjectHeading}[2]{
-    \\item
-    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
-      \\small#1 & #2 \\\\
-    \\end{tabular*}\\vspace{-7pt}
-}
-
-\\newcommand{\\resumeSubItem}[1]{\\resumeItem{#1}\\vspace{-4pt}}
-
-\\renewcommand\\labelitemii{$\\vcenter{\\hbox{\\tiny$\\bullet$}}$}
-
-\\newcommand{\\resumeSubHeadingListStart}{\\begin{itemize}[leftmargin=0.15in, label={}]}
-\\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}
-\\newcommand{\\resumeItemListStart}{\\begin{itemize}}
-\\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
-`;
-
-    // Create a conversational prompt for better resume generation
+    // Create a conversational prompt for better resume generation, inspired by the Python code you provided
     const prompt = `
 You are an expert LaTeX formatter specializing in professional resumes. Your job is to transform the provided 
 personal information and job description into a structured, well-formatted LaTeX resume.
@@ -145,23 +143,24 @@ personal information and job description into a structured, well-formatted LaTeX
 4. Use the article class with the resumeItem and resumeSubheading commands provided in the template.
 5. Follow the provided template EXACTLY - do NOT substitute with moderncv or any other package.
 
-### Resume Bullet Points:
+### Resume Bullet Points (STAR Format):
+• Use the STAR (Situation, Task, Action, Result) technique to write human-like bullet points.
 • Each bullet point must reflect a specific achievement or contribution.
 • Make each point unique, impactful, and measurable.
 • Use strong action verbs and quantify results where possible (e.g., 'Boosted efficiency by 30%').
 • NEVER mention "STAR technique" anywhere in the output.
 
 ### TEMPLATE TO USE (DO NOT MODIFY THE TEMPLATE STRUCTURE):
-${latexTemplate}
+${LATEX_TEMPLATE}
 
 ### CANDIDATE INFORMATION:
-Name: ${fullName}
-Contact: ${email} | ${phone}
+Name: ${escapeLatex(fullName)}
+Contact: ${escapeLatex(email)} | ${escapeLatex(phone)}
 
-${profileText}
+${escapeLatex(profileText)}
 
 ### JOB DESCRIPTION:
-${jobDescription}
+${escapeLatex(jobDescription)}
 
 Create a complete, compilable LaTeX document using the provided template above. The document should start with the template, include a proper \\begin{document} after the template, and end with \\end{document}.
 Return ONLY valid LaTeX code.
@@ -179,17 +178,15 @@ Structure the resume using article class following this pattern:
 
 %----------HEADING----------
 \\begin{center}
-    \\textbf{\\Huge \\scshape ${fullName}} \\\\ \\vspace{1pt}
-    \\small City, State $\\cdot$
-    \\small ${phone}  $\\cdot$
-    \\small ${email}
+    \\textbf{\\Huge \\scshape ${escapeLatex(fullName)}} \\\\ \\vspace{1pt}
+    \\small ${escapeLatex(email)}  $\\cdot$
+    \\small ${escapeLatex(phone)}
     \\linebreak
-    \\small LinkedIn
 \\end{center}
 
 %-----------EXPERIENCE-----------
 \\section{Experience}
-  \\resumeSubHeadingListStart
+  \\resumeItemListStart
     \\resumeSubheading
       {Job Title}{Date}
       {Company}{Location}
@@ -197,23 +194,21 @@ Structure the resume using article class following this pattern:
         \\resumeItem{Achievement with metrics}
         \\resumeItem{Another achievement with metrics}
       \\resumeItemListEnd
-  \\resumeSubHeadingListEnd
+  \\resumeItemListEnd
 
 %-----------EDUCATION-----------
 \\section{Education}
-  \\resumeSubHeadingListStart
+  \\resumeItemListStart
     \\resumeSubheading
       {University Name}{Location}
       {Degree}{Date}
-  \\resumeSubHeadingListEnd
+  \\resumeItemListEnd
 
 %-----------SKILLS-----------
 \\section{Skills}
- \\begin{itemize}[leftmargin=0.15in, label={}]
-    \\small{\\item{
-     Skill1 | Skill2 | Skill3
-    }}
- \\end{itemize}
+ \\resumeItemListStart
+    \\resumeItem{Skill1, Skill2, Skill3}
+ \\resumeItemListEnd
 
 \\end{document}
 `;
@@ -260,10 +255,14 @@ Structure the resume using article class following this pattern:
       latexContent = latexContent.replace(/Situation, Task, Action, Result/gi, '');
       
       // Extract only the LaTeX portion if needed
-      if (!latexContent.trim().startsWith("\\documentclass")) {
-        const match = latexContent.match(/\\documentclass.*?\\end{document}/s);
+      const extracted = extractLatex(latexContent);
+      if (extracted) {
+        latexContent = extracted;
+      } else if (!latexContent.trim().startsWith("\\documentclass")) {
+        // Try to find just the document part if we can't find the whole latex document
+        const match = latexContent.match(/\\begin\{document\}.*?\\end\{document\}/s);
         if (match) {
-          latexContent = match[0];
+          latexContent = LATEX_TEMPLATE + '\n' + match[0];
         }
       }
     } else {
