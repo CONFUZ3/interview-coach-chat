@@ -22,16 +22,27 @@ export default function ChatInterface({ mode }: ChatInterfaceProps) {
     messages,
     isProcessing,
     conversationId,
+    profileData,
     handleMessageSubmit,
     copyToClipboard,
   } = useChat(mode);
+
+  const handleDownloadMessage = (content: string) => {
+    const element = document.createElement("a");
+    const file = new Blob([content], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = `career-advice-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
 
   return (
     <div className="flex flex-col h-full">
       <MessageList 
         messages={messages} 
         onCopyMessage={copyToClipboard}
-        onDownloadMessage={() => {}}
+        onDownloadMessage={handleDownloadMessage}
       />
       
       <div className="p-4 border-t">

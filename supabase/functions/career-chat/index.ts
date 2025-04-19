@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, conversationId } = await req.json();
+    const { messages, conversationId, profileData } = await req.json();
 
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
@@ -52,8 +52,25 @@ serve(async (req) => {
     });
 
     const lastMessage = messages[messages.length - 1];
+    
+    // Construct a context-aware input with profile information
+    let contextAwareInput = lastMessage.content;
+    
+    // Add profile context to the first message only
+    if (messages.length <= 2 && profileData) {
+      const profileContext = `
+      My name is ${profileData.fullName || 'not provided'}. 
+      My email is ${profileData.email || 'not provided'}.
+      My phone number is ${profileData.phone || 'not provided'}.
+      ${profileData.resumeText ? 'I have uploaded a resume previously.' : 'I have not uploaded a resume yet.'}
+      
+      Please use this information to provide personalized career advice. Now, I'm asking: ${lastMessage.content}
+      `;
+      contextAwareInput = profileContext;
+    }
+
     const response = await chain.call({
-      input: lastMessage.content,
+      input: contextAwareInput,
     });
 
     return new Response(JSON.stringify({

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import ResumePage from "./pages/ResumePage";
+import ResumeBuilderPage from "./pages/ResumeBuilderPage";
 import InterviewPage from "./pages/InterviewPage";
 import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/resume" element={<ResumePage />} />
+          <Route path="/resume-builder" element={<ResumeBuilderPage />} />
           <Route path="/interview" element={<InterviewPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<NotFound />} />

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +8,7 @@ import {
   createConversation, 
   saveMessage 
 } from "@/services/resumeService";
+import { getUserProfile, ProfileData } from "@/services/profileService";
 import type { MessageType } from "@/components/Chat/ChatInterface";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
@@ -15,6 +17,7 @@ export function useChat(mode: "resume" | "interview") {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -59,6 +62,24 @@ export function useChat(mode: "resume" | "interview") {
     }
   }, [sessionData, isSessionLoading, navigate, toast]);
 
+  // Fetch user profile data
+  useEffect(() => {
+    if (sessionData?.session) {
+      const fetchProfile = async () => {
+        try {
+          const profile = await getUserProfile();
+          if (profile) {
+            setProfileData(profile);
+          }
+        } catch (error) {
+          console.error("Failed to fetch profile:", error);
+        }
+      };
+      
+      fetchProfile();
+    }
+  }, [sessionData]);
+
   useEffect(() => {
     if (sessionData?.session) {
       async function initConversation() {
@@ -82,11 +103,13 @@ export function useChat(mode: "resume" | "interview") {
   }, [sessionData, toast]);
 
   useEffect(() => {
+    const greetingName = profileData?.fullName ? `, ${profileData.fullName.split(' ')[0]}` : '';
+    
     const initialMessage: MessageType = {
       id: generateId(),
       content: mode === "resume" 
-        ? "Hello! I'm your AI career coach powered by LangChain. I can help you with resume writing, career transitions, and professional development. How can I assist you today?"
-        : "Hello! I'm your AI interview coach powered by LangChain. I can help you prepare for interviews and provide feedback on your responses. Would you like to start a mock interview?",
+        ? `Hello${greetingName}! I'm your AI career coach powered by LangChain. I can help you with resume writing, career transitions, and professional development. How can I assist you today?`
+        : `Hello${greetingName}! I'm your AI interview coach powered by LangChain. I can help you prepare for interviews and provide feedback on your responses. Would you like to start a mock interview?`,
       type: "ai",
       timestamp: new Date(),
       category: "general"
@@ -99,7 +122,7 @@ export function useChat(mode: "resume" | "interview") {
         console.error("Failed to save initial message:", error);
       });
     }
-  }, [mode, conversationId]);
+  }, [mode, conversationId, profileData]);
 
   const handleMessageSubmit = async (messageContent: string) => {
     if (!conversationId) return;
@@ -127,7 +150,11 @@ export function useChat(mode: "resume" | "interview") {
       }]);
 
       const response = await supabase.functions.invoke('career-chat', {
-        body: { messages: [...messages, userMessage], conversationId }
+        body: { 
+          messages: [...messages, userMessage], 
+          conversationId,
+          profileData 
+        }
       });
 
       if (response.error) {
@@ -167,6 +194,7 @@ export function useChat(mode: "resume" | "interview") {
     messages,
     isProcessing,
     conversationId,
+    profileData,
     handleMessageSubmit,
     copyToClipboard: (content: string) => {
       navigator.clipboard.writeText(content);

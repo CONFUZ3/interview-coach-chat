@@ -14,7 +14,7 @@ const ResumePage = () => {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Career Coach AI</h1>
             <p className="text-muted-foreground mt-1">
-              Get personalized career advice and resume improvement tips
+              Get personalized career advice tailored to your profile
             </p>
           </div>
           <Badge variant="outline" className="bg-accent">
@@ -26,14 +26,14 @@ const ResumePage = () => {
           <Info className="h-4 w-4 text-blue-500" />
           <AlertTitle className="text-sm">How to Use the Career Coach</AlertTitle>
           <AlertDescription className="text-xs mt-1">
-            Ask about interview tips, resume improvement, career transitions, or any other career-related questions. The AI coach will provide personalized guidance based on industry best practices.
+            Ask about interview tips, resume improvement, career transitions, or any other career-related questions. The AI coach will provide personalized guidance based on your profile and industry best practices.
           </AlertDescription>
         </Alert>
         
         <Card className="mb-2 bg-accent/50">
           <CardContent className="py-2">
             <CardDescription className="flex gap-2 text-xs text-center justify-center">
-              Our AI coach uses data from industry experts to provide relevant career advice
+              Your profile information is used to provide more relevant career advice
             </CardDescription>
           </CardContent>
         </Card>

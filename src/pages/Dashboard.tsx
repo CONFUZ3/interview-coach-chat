@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, MessageSquare, User, ArrowRight, Loader2 } from "lucide-react";
@@ -5,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/Layout/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
-import { getUserProfile } from "@/services/resumeService";
+import { getUserProfile } from "@/services/profileService";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -38,20 +39,20 @@ const Dashboard = () => {
 
   const features = [
     {
-      title: "AI Resume Builder",
-      description: "Generate customized resumes tailored to specific job descriptions based on your profile information.",
-      icon: FileText,
-      path: "/resume",
-      color: "text-blue-500",
-      bgColor: "bg-blue-100 dark:bg-blue-900/20",
-    },
-    {
-      title: "Mock Interview Coach",
-      description: "Practice interviews with our AI coach and receive real-time feedback to improve your interview skills.",
+      title: "Career Coach AI",
+      description: "Get personalized career advice and coaching from our AI assistant tailored to your profile.",
       icon: MessageSquare,
-      path: "/interview",
+      path: "/resume",
       color: "text-purple-500",
       bgColor: "bg-purple-100 dark:bg-purple-900/20",
+    },
+    {
+      title: "Resume Builder",
+      description: "Create professional resumes based on your profile and career coach recommendations.",
+      icon: FileText,
+      path: "/resume-builder",
+      color: "text-blue-500",
+      bgColor: "bg-blue-100 dark:bg-blue-900/20",
     },
     {
       title: "Profile Management",
@@ -98,7 +99,7 @@ const Dashboard = () => {
                 <div>
                   <h3 className="font-medium text-amber-800 dark:text-amber-300">Complete Your Profile</h3>
                   <p className="text-amber-700 dark:text-amber-400 text-sm mt-1">
-                    For the best experience, please complete your professional profile to get personalized resumes and interview coaching.
+                    For the best experience, please complete your professional profile to get personalized career advice and resume building.
                   </p>
                 </div>
                 <Button
