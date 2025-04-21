@@ -28,6 +28,7 @@ const ResumeBuilderPage = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [pastedResumeText, setPastedResumeText] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -57,6 +58,10 @@ const ResumeBuilderPage = () => {
         if (profile) {
           console.log("Profile loaded for resume builder");
           setProfileData(profile);
+          // Initialize resume text from profile if available
+          if (profile.resumeText) {
+            setPastedResumeText(profile.resumeText);
+          }
         } else {
           console.log("No profile data found");
         }
@@ -88,8 +93,11 @@ const ResumeBuilderPage = () => {
     setIsLoading(true);
     setSaveSuccess(false);
     try {
+      // Use the pasted resume text if available
+      const previousResumeText = pastedResumeText || profileData?.resumeText;
+      
       // Use the generateResumeWithAI service
-      const { resumeText, resumeLatex, profileData: updatedProfile } = await generateResumeWithAI(jobDescription, profileData?.resume_text);
+      const { resumeText, resumeLatex, profileData: updatedProfile } = await generateResumeWithAI(jobDescription, previousResumeText);
       
       setResumeContent(resumeText || "");
       setLatexSource(resumeLatex || "");
@@ -308,6 +316,20 @@ const ResumeBuilderPage = () => {
                   onChange={(e) => setCompany(e.target.value)}
                   placeholder="Company name"
                 />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="previousResume">Previous Resume</Label>
+                <Textarea
+                  id="previousResume"
+                  value={pastedResumeText}
+                  onChange={(e) => setPastedResumeText(e.target.value)}
+                  placeholder="Paste your existing resume text here (optional)..."
+                  className="min-h-[150px]"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Paste your existing resume to help the AI better understand your experience and skills
+                </p>
               </div>
               
               <div className="space-y-2">
