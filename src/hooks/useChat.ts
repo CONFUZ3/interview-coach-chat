@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   createConversation, 
   saveMessage 
-} from "@/services/resumeService";
+} from "@/services/conversationService";
 import { getUserProfile, ProfileData } from "@/services/profileService";
 import type { MessageType } from "@/components/Chat/ChatInterface";
 
@@ -18,6 +18,7 @@ export function useChat(mode: "resume" | "interview") {
   const [isProcessing, setIsProcessing] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -66,26 +67,38 @@ export function useChat(mode: "resume" | "interview") {
   useEffect(() => {
     if (sessionData?.session) {
       const fetchProfile = async () => {
+        setIsProfileLoading(true);
         try {
           const profile = await getUserProfile();
           if (profile) {
+            console.log("Profile loaded for chat:", profile.fullName);
             setProfileData(profile);
+          } else {
+            console.log("No profile data available");
+            toast({
+              title: "Profile recommended",
+              description: "For personalized advice, please complete your profile.",
+            });
           }
         } catch (error) {
           console.error("Failed to fetch profile:", error);
+        } finally {
+          setIsProfileLoading(false);
         }
       };
       
       fetchProfile();
     }
-  }, [sessionData]);
+  }, [sessionData, toast]);
 
   useEffect(() => {
     if (sessionData?.session) {
       async function initConversation() {
         try {
+          console.log("Initializing conversation");
           const conversation = await createConversation();
           if (conversation && conversation.id) {
+            console.log("Conversation created with ID:", conversation.id);
             setConversationId(conversation.id);
           }
         } catch (error) {
@@ -103,6 +116,8 @@ export function useChat(mode: "resume" | "interview") {
   }, [sessionData, toast]);
 
   useEffect(() => {
+    if (isProfileLoading || !conversationId) return;
+    
     const greetingName = profileData?.fullName ? `, ${profileData.fullName.split(' ')[0]}` : '';
     
     const initialMessage: MessageType = {
@@ -115,6 +130,7 @@ export function useChat(mode: "resume" | "interview") {
       category: "general"
     };
     
+    console.log("Setting initial message with greeting:", greetingName ? "personalized" : "generic");
     setMessages([initialMessage]);
     
     if (conversationId) {
@@ -122,10 +138,18 @@ export function useChat(mode: "resume" | "interview") {
         console.error("Failed to save initial message:", error);
       });
     }
-  }, [mode, conversationId, profileData]);
+  }, [mode, conversationId, profileData, isProfileLoading]);
 
   const handleMessageSubmit = async (messageContent: string) => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      console.error("No conversation ID available");
+      toast({
+        title: "Error",
+        description: "Chat session not initialized. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     const userMessage: MessageType = {
       id: generateId(),
@@ -138,6 +162,7 @@ export function useChat(mode: "resume" | "interview") {
     setIsProcessing(true);
     
     try {
+      console.log("Saving user message to conversation:", conversationId);
       await saveMessage(conversationId, userMessage);
       
       const typingIndicatorId = generateId();
@@ -149,6 +174,7 @@ export function useChat(mode: "resume" | "interview") {
         isTyping: true 
       }]);
 
+      console.log("Sending to career-chat with profile data:", !!profileData);
       const response = await supabase.functions.invoke('career-chat', {
         body: { 
           messages: [...messages, userMessage], 
@@ -158,6 +184,7 @@ export function useChat(mode: "resume" | "interview") {
       });
 
       if (response.error) {
+        console.error("Error from career-chat function:", response.error);
         throw new Error(response.error.message);
       }
 
@@ -171,7 +198,10 @@ export function useChat(mode: "resume" | "interview") {
         format: "text"
       };
       
+      console.log("Received AI response, updating messages");
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Save AI response to the conversation
       await saveMessage(conversationId, aiMessage);
       
     } catch (error) {
@@ -195,6 +225,7 @@ export function useChat(mode: "resume" | "interview") {
     isProcessing,
     conversationId,
     profileData,
+    isProfileLoading,
     handleMessageSubmit,
     copyToClipboard: (content: string) => {
       navigator.clipboard.writeText(content);

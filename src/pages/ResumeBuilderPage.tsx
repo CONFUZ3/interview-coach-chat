@@ -11,35 +11,51 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
-import { Info, FileText, Download, Copy, ArrowRight } from "lucide-react";
-import { getUserProfile, ProfileData } from "@/services/profileService";
+import { Info, FileText, Download, Copy, ArrowRight, UserCog } from "lucide-react";
+import { getUserProfile, saveResume, ProfileData } from "@/services/profileService";
 import { supabase } from "@/integrations/supabase/client";
 
 const ResumeBuilderPage = () => {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [resumeContent, setResumeContent] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [activeTab, setActiveTab] = useState("editor");
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Check session first
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to use this feature.",
+          variant: "destructive",
+        });
+        navigate('/');
+      }
+    };
+    
+    checkSession();
+  }, [navigate, toast]);
 
   // Fetch user profile data
   useEffect(() => {
     const fetchProfile = async () => {
+      setIsProfileLoading(true);
       try {
         const profile = await getUserProfile();
         if (profile) {
+          console.log("Profile loaded for resume builder");
           setProfileData(profile);
         } else {
-          toast({
-            title: "Profile required",
-            description: "Please complete your profile before using the resume builder.",
-            variant: "destructive",
-          });
-          navigate("/profile");
+          console.log("No profile data found");
         }
       } catch (error) {
         console.error("Failed to fetch profile:", error);
@@ -48,11 +64,13 @@ const ResumeBuilderPage = () => {
           description: "Failed to load your profile. Please try again.",
           variant: "destructive",
         });
+      } finally {
+        setIsProfileLoading(false);
       }
     };
     
     fetchProfile();
-  }, [navigate, toast]);
+  }, [toast]);
 
   const handleGenerateResume = async () => {
     if (!jobDescription) {
@@ -65,6 +83,7 @@ const ResumeBuilderPage = () => {
     }
 
     setIsLoading(true);
+    setSaveSuccess(false);
     try {
       // Call the career-chat function with a specific prompt for resume
       const resumePrompt = `Based on my profile information, please create a professional resume for a ${jobTitle} position at ${company}. 
@@ -72,6 +91,7 @@ const ResumeBuilderPage = () => {
       
       Please format the result as a clean, professional resume with clear sections for contact information, summary, experience, skills, and education.`;
 
+      console.log("Generating resume with job title:", jobTitle);
       const response = await supabase.functions.invoke('career-chat', {
         body: { 
           messages: [{ content: resumePrompt, type: "user" }], 
@@ -81,6 +101,7 @@ const ResumeBuilderPage = () => {
       });
 
       if (response.error) {
+        console.error("Error from career-chat function:", response.error);
         throw new Error(response.error.message);
       }
 
@@ -88,12 +109,16 @@ const ResumeBuilderPage = () => {
       setActiveTab("preview");
       
       // Save the generated resume to the database
-      await supabase.from('resumes').insert({
-        user_id: (await supabase.auth.getSession()).data.session?.user.id,
-        content: response.data.reply,
-        job_title: jobTitle,
-        company: company
-      });
+      console.log("Saving generated resume");
+      const success = await saveResume(response.data.reply, jobTitle, company);
+      
+      if (success) {
+        setSaveSuccess(true);
+        toast({
+          title: "Resume saved",
+          description: "Your resume has been generated and saved successfully.",
+        });
+      }
 
     } catch (error) {
       console.error("Error generating resume:", error);
@@ -124,6 +149,49 @@ const ResumeBuilderPage = () => {
     element.click();
     document.body.removeChild(element);
   };
+
+  if (isProfileLoading) {
+    return (
+      <AppLayout>
+        <div className="container py-6 md:py-8 flex justify-center items-center" style={{ minHeight: "50vh" }}>
+          <div className="text-center">
+            <Spinner className="h-10 w-10 mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading your profile data...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!profileData) {
+    return (
+      <AppLayout>
+        <div className="container py-6 md:py-8 flex justify-center items-center" style={{ minHeight: "50vh" }}>
+          <Card className="max-w-md text-center">
+            <CardHeader>
+              <CardTitle className="flex justify-center">
+                <UserCog className="h-12 w-12 mb-2 text-primary opacity-70" />
+              </CardTitle>
+              <CardTitle>Profile Required</CardTitle>
+              <CardDescription>
+                Please complete your profile before using the resume builder.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-6">
+                The resume builder needs your personal information to create a personalized resume.
+              </p>
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Button onClick={() => navigate('/profile')}>
+                Complete Profile
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -194,11 +262,17 @@ const ResumeBuilderPage = () => {
               <Button 
                 onClick={handleGenerateResume}
                 disabled={isLoading || !jobDescription}
+                className={saveSuccess ? "bg-green-600 hover:bg-green-700" : ""}
               >
                 {isLoading ? (
                   <>
                     <Spinner className="mr-2 h-4 w-4" />
                     Generating...
+                  </>
+                ) : saveSuccess ? (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Generated & Saved
                   </>
                 ) : (
                   <>
@@ -228,7 +302,10 @@ const ResumeBuilderPage = () => {
               <TabsContent value="editor" className="mt-0">
                 <Textarea 
                   value={resumeContent}
-                  onChange={(e) => setResumeContent(e.target.value)}
+                  onChange={(e) => {
+                    setResumeContent(e.target.value);
+                    setSaveSuccess(false);
+                  }}
                   placeholder="Your generated resume will appear here..."
                   className="min-h-[400px] font-mono text-sm"
                 />

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload } from "lucide-react";
+import { Upload, CheckCircle } from "lucide-react";
 import { getUserProfile, saveUserProfile, ProfileData } from "@/services/profileService";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ProfileForm() {
   const [profile, setProfile] = useState<ProfileData>({
@@ -21,12 +22,48 @@ export default function ProfileForm() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Fetch existing profile data on component mount
+  useEffect(() => {
+    async function fetchProfile() {
+      setIsFetching(true);
+      try {
+        const sessionData = await supabase.auth.getSession();
+        if (!sessionData.data.session) {
+          navigate('/');
+          return;
+        }
+        
+        const profileData = await getUserProfile();
+        if (profileData) {
+          setProfile(profileData);
+          console.log("Loaded profile data:", profileData);
+        } else {
+          console.log("No profile data found, using defaults");
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load your profile. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsFetching(false);
+      }
+    }
+    
+    fetchProfile();
+  }, [navigate, toast]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
     setUploadStatus(null);
+    setSaveSuccess(false);
     
     if (!e.target.files || e.target.files.length === 0) {
       return;
@@ -79,15 +116,18 @@ export default function ProfileForm() {
 
   const handleSaveProfile = async () => {
     setIsLoading(true);
+    setSaveSuccess(false);
+    
     try {
       const success = await saveUserProfile(profile);
       
       if (success) {
+        setSaveSuccess(true);
         toast({
           title: "Profile saved",
           description: "Your profile has been updated successfully.",
         });
-        navigate("/resume");
+        // Don't navigate away automatically - show success state instead
       } else {
         toast({
           title: "Error saving profile",
@@ -96,6 +136,7 @@ export default function ProfileForm() {
         });
       }
     } catch (error) {
+      console.error("Error saving profile:", error);
       toast({
         title: "Error saving profile",
         description: "There was an error saving your profile. Please try again.",
@@ -105,6 +146,17 @@ export default function ProfileForm() {
       setIsLoading(false);
     }
   };
+
+  if (isFetching) {
+    return (
+      <Card className="w-full max-w-xl">
+        <CardContent className="flex justify-center items-center py-10">
+          <Spinner className="h-8 w-8" />
+          <span className="ml-2">Loading profile data...</span>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-xl">
@@ -192,9 +244,32 @@ export default function ProfileForm() {
           )}
         </div>
       </CardContent>
-      <CardFooter>
-        <Button onClick={handleSaveProfile} disabled={isLoading} className="ml-auto">
-          {isLoading ? "Saving..." : "Save Profile"}
+      <CardFooter className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate("/resume")}
+          disabled={isLoading}
+        >
+          Back to Career Coach
+        </Button>
+        <Button 
+          onClick={handleSaveProfile} 
+          disabled={isLoading}
+          className={saveSuccess ? "bg-green-600 hover:bg-green-700" : ""}
+        >
+          {isLoading ? (
+            <>
+              <Spinner className="mr-2 h-4 w-4" />
+              Saving...
+            </>
+          ) : saveSuccess ? (
+            <>
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Saved!
+            </>
+          ) : (
+            "Save Profile"
+          )}
         </Button>
       </CardFooter>
     </Card>

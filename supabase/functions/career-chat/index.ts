@@ -24,6 +24,18 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
+    console.log("Processing chat request with conversation ID:", conversationId);
+    if (profileData) {
+      console.log("Profile data available:", {
+        name: profileData.fullName,
+        email: profileData.email !== undefined,
+        phone: profileData.phone !== undefined,
+        hasResume: profileData.resumeText !== undefined
+      });
+    } else {
+      console.log("No profile data provided");
+    }
+
     const llm = new ChatOpenAI({
       openAIApiKey,
       modelName: "gpt-4o-mini",
@@ -37,6 +49,7 @@ serve(async (req) => {
 
     // Load previous messages into memory
     if (messages && messages.length > 0) {
+      console.log(`Loading ${messages.length} previous messages into memory`);
       for (const msg of messages) {
         await memory.saveContext(
           { input: msg.content },
@@ -53,26 +66,36 @@ serve(async (req) => {
 
     const lastMessage = messages[messages.length - 1];
     
-    // Construct a context-aware input with profile information
+    // Always include profile context for better personalization
     let contextAwareInput = lastMessage.content;
     
-    // Add profile context to the first message only
-    if (messages.length <= 2 && profileData) {
+    // Add profile context if available
+    if (profileData) {
       const profileContext = `
-      My name is ${profileData.fullName || 'not provided'}. 
-      My email is ${profileData.email || 'not provided'}.
-      My phone number is ${profileData.phone || 'not provided'}.
-      ${profileData.resumeText ? 'I have uploaded a resume previously.' : 'I have not uploaded a resume yet.'}
+      User Profile Information:
+      Name: ${profileData.fullName || 'not provided'}
+      Email: ${profileData.email || 'not provided'}
+      Phone: ${profileData.phone || 'not provided'}
+      ${profileData.resumeText ? 'The user has previously uploaded resume content.' : 'No resume has been uploaded yet.'}
       
-      Please use this information to provide personalized career advice. Now, I'm asking: ${lastMessage.content}
+      Based on this profile information, provide personalized career advice for the following query: ${lastMessage.content}
       `;
-      contextAwareInput = profileContext;
+      
+      // For the first few messages, include the profile context explicitly
+      if (messages.length <= 3) {
+        contextAwareInput = profileContext;
+      } else {
+        // For later messages, just append a reminder about personalization
+        contextAwareInput = `Remember to personalize your response for ${profileData.fullName || 'the user'}. Query: ${lastMessage.content}`;
+      }
     }
 
+    console.log("Sending to LLM with context-aware input");
     const response = await chain.call({
       input: contextAwareInput,
     });
 
+    console.log("Response received from LLM");
     return new Response(JSON.stringify({
       reply: response.response,
       conversationId,
