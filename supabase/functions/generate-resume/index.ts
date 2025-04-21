@@ -1,4 +1,3 @@
-
 // This is the Supabase Edge Function that generates resumes using the Gemini API
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -10,7 +9,8 @@ const corsHeaders = {
 
 // LaTeX template based on the provided Python code
 const LATEX_TEMPLATE = `
-\\documentclass[a4paper,12pt]{article}
+\\documentclass[letterpaper,11pt]{article}
+
 \\usepackage{latexsym}
 \\usepackage[empty]{fullpage}
 \\usepackage{titlesec}
@@ -22,30 +22,54 @@ const LATEX_TEMPLATE = `
 \\usepackage{fancyhdr}
 \\usepackage[english]{babel}
 \\usepackage{tabularx}
-\\usepackage[left=0.5in,top=0.6in,right=0.5in,bottom=0.6in]{geometry}
+\\input{glyphtounicode}
 
-\\urlstyle{same}
-\\raggedbottom
-\\raggedright
-\\setlength{\\tabcolsep}{0in}
+%----------FONT OPTIONS----------
+% sans-serif
+% \\usepackage[sfdefault]{FiraSans}
+% \\usepackage[sfdefault]{roboto}
+% \\usepackage[sfdefault]{noto-sans}
+% \\usepackage[default]{sourcesanspro}
+
+% serif
+% \\usepackage{CormorantGaramond}
+% \\usepackage{charter}
 
 \\pagestyle{fancy}
-\\fancyhf{}
+\\fancyhf{} % clear all header and footer fields
+\\fancyfoot{}
 \\renewcommand{\\headrulewidth}{0pt}
 \\renewcommand{\\footrulewidth}{0pt}
 
-% Ensure enough space at the bottom
-\\setlength{\\footskip}{4.5pt}
+% Adjust margins
+\\addtolength{\\oddsidemargin}{-0.5in}
+\\addtolength{\\evensidemargin}{-0.5in}
+\\addtolength{\\textwidth}{1in}
+\\addtolength{\\topmargin}{-.5in}
+\\addtolength{\\textheight}{1.0in}
+
+\\urlstyle{same}
+
+\\raggedbottom
+\\raggedright
+\\setlength{\\tabcolsep}{0in}
 
 % Sections formatting
 \\titleformat{\\section}{
   \\vspace{-4pt}\\scshape\\raggedright\\large
 }{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]
 
+% Ensure PDF is machine readable/ATS parsable
+\\pdfgentounicode=1
+
+%-------------------------
 % Custom commands
 \\newcommand{\\resumeItem}[1]{
-  \\item\\small{{#1 \\vspace{-2pt}}}
+  \\item\\small{
+    {#1 \\vspace{-2pt}}
+  }
 }
+
 \\newcommand{\\resumeSubheading}[4]{
   \\vspace{-2pt}\\item
     \\begin{tabular*}{0.97\\textwidth}[t]{l@{\\extracolsep{\\fill}}r}
@@ -53,8 +77,29 @@ const LATEX_TEMPLATE = `
       \\textit{\\small#3} & \\textit{\\small #4} \\\\
     \\end{tabular*}\\vspace{-7pt}
 }
-\\newcommand{\\resumeItemListStart}{\\begin{itemize}[leftmargin=0.15in, itemsep=0pt]}
-\\newcommand{\\resumeItemListEnd}{\\end{itemize}}
+
+\\newcommand{\\resumeSubSubheading}[2]{
+    \\item
+    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
+      \\textit{\\small#1} & \\textit{\\small #2} \\\\
+    \\end{tabular*}\\vspace{-7pt}
+}
+
+\\newcommand{\\resumeProjectHeading}[2]{
+    \\item
+    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
+      \\small#1 & #2 \\\\
+    \\end{tabular*}\\vspace{-7pt}
+}
+
+\\newcommand{\\resumeSubItem}[1]{\\resumeItem{#1}\\vspace{-4pt}}
+
+\\renewcommand\\labelitemii{$\\vcenter{\\hbox{\\tiny$\\bullet$}}$}
+
+\\newcommand{\\resumeSubHeadingListStart}{\\begin{itemize}[leftmargin=0.15in, label={}]}
+\\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}
+\\newcommand{\\resumeItemListStart}{\\begin{itemize}}
+\\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
 `;
 
 // Function to escape special LaTeX characters in user input
@@ -123,94 +168,87 @@ serve(async (req) => {
       );
     }
     
-    // Format basic user information - allow using just uploaded resume instead of full profile
+    // PROFILE BUILDING LOGIC:
+    // Build a rich candidate profile summary for the prompt
     let fullName = userProfile?.fullName || "Your Name";
     let email = userProfile?.email || "email@example.com";
     let phone = userProfile?.phone || "(123) 456-7890";
-    
-    // Set up profile text from the previous resume or minimal profile info
-    let profileText = previousResume || "Minimal profile information provided";
-    
-    // Create a conversational prompt for better resume generation, inspired by the Python code you provided
+    let linkedin = userProfile?.linkedin || "";
+    let github = userProfile?.github || "";
+    let summary = userProfile?.summary || ""; // Expecting a "summary" or similar field for career/professional summary
+    let resumeText = previousResume || userProfile?.resumeText || "";
+
+    // Combine links nicely
+    let contactLine =
+      [
+        escapeLatex(phone),
+        email ? `\\href{mailto:${escapeLatex(email)}}{\\underline{${escapeLatex(email)}}}` : "",
+        linkedin ? `\\href{${escapeLatex(linkedin)}}{\\underline{${escapeLatex(linkedin)}}}` : "",
+        github ? `\\href{${escapeLatex(github)}}{\\underline{${escapeLatex(github)}}}` : "",
+      ]
+        .filter(Boolean)
+        .join(" $|$ ");
+
+    // PROMPT for Gemini LLM:
     const prompt = `
-You are an expert LaTeX formatter specializing in professional resumes. Your job is to transform the provided 
-personal information and job description into a structured, well-formatted LaTeX resume.
+You are an expert LaTeX formatter specializing in professional resumes. Generate a complete, fully-compilable LaTeX resume using only the template provided.
 
-### Formatting Rules:
-1. Output must be 100% valid LaTeX code. No explanations, comments, or additional text.
-2. Ensure correct syntax and escaping. Escape any LaTeX special characters in user data.
-3. The output must be directly compilable.
-4. Use the article class with the resumeItem and resumeSubheading commands provided in the template.
-5. Follow the provided template EXACTLY - do NOT substitute with moderncv or any other package.
-
-### Resume Bullet Points (STAR Format):
-• Use the STAR (Situation, Task, Action, Result) technique to write human-like bullet points.
-• Each bullet point must reflect a specific achievement or contribution.
-• Make each point unique, impactful, and measurable.
-• Use strong action verbs and quantify results where possible (e.g., 'Boosted efficiency by 30%').
-• NEVER mention "STAR technique" anywhere in the output.
-
-### TEMPLATE TO USE (DO NOT MODIFY THE TEMPLATE STRUCTURE):
+**Must-Keep Formatting and Sections (do NOT deviate):**
+- Use this template exactly:
 ${LATEX_TEMPLATE}
 
-### CANDIDATE INFORMATION:
-Name: ${escapeLatex(fullName)}
-Contact: ${escapeLatex(email)} | ${escapeLatex(phone)}
+- The output must:
+  - Start with \\begin{document} and end with \\end{document}
+  - BE 100% pure valid LaTeX with no extra explanations or comments.
+  - Use the AT&T/ATS-friendly format.
+  - INLCUDE ALL recommended \section{} and command styles. Add any new custom commands you need only using the pattern style in the template.
+  - NEVER write "STAR technique" or similar in your output.
+  - Do not change the font or documentclass/geometry.
 
-${escapeLatex(profileText)}
-
-### JOB DESCRIPTION:
-${escapeLatex(jobDescription)}
-
-Create a complete, compilable LaTeX document using the provided template above. The document should start with the template, include a proper \\begin{document} after the template, and end with \\end{document}.
-Return ONLY valid LaTeX code.
-
-The basic structure of the resume should be:
-1. Name and contact at the top (centered)
-2. Professional summary or objective
-3. Work experience section with bullet points
-4. Education section
-5. Skills section
-
-Structure the resume using article class following this pattern:
+**Populate the following sections & structure:**
 
 \\begin{document}
-
-%----------HEADING----------
 \\begin{center}
-    \\textbf{\\Huge \\scshape ${escapeLatex(fullName)}} \\\\ \\vspace{1pt}
-    \\small ${escapeLatex(email)}  $\\cdot$
-    \\small ${escapeLatex(phone)}
-    \\linebreak
+  \\textbf{\\Huge \\scshape ${escapeLatex(fullName)}} \\\\ \\vspace{1pt}
+  \\small ${contactLine}
 \\end{center}
 
-%-----------EXPERIENCE-----------
-\\section{Experience}
-  \\resumeItemListStart
-    \\resumeSubheading
-      {Job Title}{Date}
-      {Company}{Location}
-      \\resumeItemListStart
-        \\resumeItem{Achievement with metrics}
-        \\resumeItem{Another achievement with metrics}
-      \\resumeItemListEnd
-  \\resumeItemListEnd
+1. \\section{Career Summary}
+  - Write a succinct, 2-5 line summary describing the candidate’s background, skills, industry, and motivation for the job.
+  - Base this summary on the data below and the job description. You *MUST* synthesize from both current profile, resume, and described skills.
 
-%-----------EDUCATION-----------
-\\section{Education}
-  \\resumeItemListStart
-    \\resumeSubheading
-      {University Name}{Location}
-      {Degree}{Date}
-  \\resumeItemListEnd
+2. \\section{Education}
+  - List all degrees, schools, and timeframes in most recent first order.
 
-%-----------SKILLS-----------
-\\section{Skills}
- \\resumeItemListStart
-    \\resumeItem{Skill1, Skill2, Skill3}
- \\resumeItemListEnd
+3. \\section{Experience}
+  - For each job, list:
+    * Title, Dates, Company, Location (using \\resumeSubheading)
+    * 2-5 resume bullet points (\\resumeItem), following STAR principles, tailored to the job.
+
+4. \\section{Projects} (optional; include if present)
+  - Major relevant academic/personal projects.
+
+5. \\section{Technical Skills}
+  - Group technical skills, frameworks, tools, and languages in neat lines.
+
+**CANDIDATE PROFILE (All values escaped for LaTeX):**
+Name: ${escapeLatex(fullName)}
+Email: ${escapeLatex(email)}
+Phone: ${escapeLatex(phone)}
+Linkedin: ${escapeLatex(linkedin)}
+Github: ${escapeLatex(github)}
+
+Current Summary: ${escapeLatex(summary)}
+Paste of previous resume/profile content (free text):
+${escapeLatex(resumeText)}
+
+**FOR THE JOB BELOW, fully tailor the resume:**
+Job Description: 
+${escapeLatex(jobDescription)}
 
 \\end{document}
+
+Return ONLY valid LaTeX code starting at \\documentclass.
 `;
 
     console.log("Calling Gemini API with prompt");
