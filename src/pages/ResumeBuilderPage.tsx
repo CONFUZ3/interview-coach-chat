@@ -11,15 +11,18 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
-import { Info, FileText, Download, Copy, ArrowRight, UserCog } from "lucide-react";
+import { Info, FileText, Download, Copy, ArrowRight, UserCog, CheckCircle } from "lucide-react";
 import { getUserProfile, saveResume, ProfileData } from "@/services/profileService";
 import { supabase } from "@/integrations/supabase/client";
+import { compileLatexToPDF, downloadLatexSource } from "@/services/latexService";
+import { generateResumeWithAI } from "@/services/resumeGenerationService";
 
 const ResumeBuilderPage = () => {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [resumeContent, setResumeContent] = useState("");
+  const [latexSource, setLatexSource] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [activeTab, setActiveTab] = useState("editor");
   const [jobTitle, setJobTitle] = useState("");
@@ -85,32 +88,16 @@ const ResumeBuilderPage = () => {
     setIsLoading(true);
     setSaveSuccess(false);
     try {
-      // Call the career-chat function with a specific prompt for resume
-      const resumePrompt = `Based on my profile information, please create a professional resume for a ${jobTitle} position at ${company}. 
-      The job description is: ${jobDescription}
+      // Use the generateResumeWithAI service
+      const { resumeText, resumeLatex, profileData: updatedProfile } = await generateResumeWithAI(jobDescription, profileData?.resume_text);
       
-      Please format the result as a clean, professional resume with clear sections for contact information, summary, experience, skills, and education.`;
-
-      console.log("Generating resume with job title:", jobTitle);
-      const response = await supabase.functions.invoke('career-chat', {
-        body: { 
-          messages: [{ content: resumePrompt, type: "user" }], 
-          conversationId: null, // Don't save this as part of chat history
-          profileData 
-        }
-      });
-
-      if (response.error) {
-        console.error("Error from career-chat function:", response.error);
-        throw new Error(response.error.message);
-      }
-
-      setResumeContent(response.data.reply);
+      setResumeContent(resumeText || "");
+      setLatexSource(resumeLatex || "");
       setActiveTab("preview");
       
       // Save the generated resume to the database
       console.log("Saving generated resume");
-      const success = await saveResume(response.data.reply, jobTitle, company);
+      const success = await saveResume(resumeText, jobTitle, company);
       
       if (success) {
         setSaveSuccess(true);
@@ -129,6 +116,88 @@ const ResumeBuilderPage = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!latexSource && !resumeContent) {
+      toast({
+        title: "No content",
+        description: "Please generate a resume first before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      toast({
+        title: "Preparing PDF",
+        description: "Your resume is being formatted as PDF...",
+      });
+      
+      let pdfBlob;
+      
+      if (latexSource) {
+        // Use LaTeX compiler if we have LaTeX source
+        pdfBlob = await compileLatexToPDF(latexSource);
+      } else {
+        // Fallback to basic PDF generation
+        toast({
+          title: "Using basic formatting",
+          description: "LaTeX source not available, using simplified PDF formatting.",
+        });
+        return;
+      }
+      
+      // Create download link
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `resume-${jobTitle.toLowerCase().replace(/\s+/g, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "PDF Downloaded",
+        description: "Your resume has been downloaded successfully.",
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadLatex = () => {
+    if (!latexSource) {
+      toast({
+        title: "No LaTeX content",
+        description: "Please generate a resume first before downloading LaTeX.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const filename = `resume-${jobTitle.toLowerCase().replace(/\s+/g, '-')}.tex`;
+      downloadLatexSource(latexSource, filename);
+      
+      toast({
+        title: "LaTeX Downloaded",
+        description: "Your resume LaTeX source has been downloaded successfully.",
+      });
+    } catch (error) {
+      console.error("Error downloading LaTeX:", error);
+      toast({
+        title: "Error",
+        description: "Failed to download LaTeX source. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -333,20 +402,29 @@ const ResumeBuilderPage = () => {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => handleDownloadLatex()}
+                disabled={!latexSource}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Download LaTeX
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownloadPDF()}
+                disabled={!latexSource && !resumeContent}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => copyToClipboard(resumeContent)}
                 disabled={!resumeContent}
               >
                 <Copy className="mr-2 h-4 w-4" />
                 Copy
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => downloadAsTxt(resumeContent, `resume-${jobTitle.toLowerCase().replace(/\s+/g, '-')}.txt`)}
-                disabled={!resumeContent}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Download
               </Button>
             </CardFooter>
           </Card>

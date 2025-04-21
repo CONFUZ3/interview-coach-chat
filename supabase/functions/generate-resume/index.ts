@@ -122,7 +122,7 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
-
+    
     // Format basic user information - allow using just uploaded resume instead of full profile
     let fullName = userProfile?.fullName || "Your Name";
     let email = userProfile?.email || "email@example.com";

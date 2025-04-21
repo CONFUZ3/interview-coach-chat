@@ -41,7 +41,7 @@ export async function saveMessage(conversationId: string, message: MessageType) 
   try {
     console.log(`Saving ${message.type} message to conversation ${conversationId}`);
     
-    const messageData = {
+    const messageData: any = {
       conversation_id: conversationId,
       type: message.type,
       content: message.content
@@ -49,7 +49,7 @@ export async function saveMessage(conversationId: string, message: MessageType) 
     
     // Only add format if it exists
     if (message.format) {
-      Object.assign(messageData, { format: message.format });
+      messageData.format = message.format;
     }
     
     const { error } = await supabase

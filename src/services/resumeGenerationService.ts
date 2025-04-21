@@ -43,9 +43,25 @@ export async function generateResumeWithAI(jobDescription: string, previousResum
       throw new Error("No response received from resume generation service");
     }
     
+    // Extract the plain text version from LaTeX if needed
+    let plainTextResume = "";
+    if (data.resumeLatex) {
+      // Very simple conversion of LaTeX to plain text for display
+      plainTextResume = data.resumeLatex
+        .replace(/\\section\{([^}]+)\}/g, "\n\n$1\n")
+        .replace(/\\begin\{[^}]+\}|\\\end\{[^}]+\}/g, "")
+        .replace(/\\resumeItem\{([^}]+)\}/g, "• $1")
+        .replace(/\\textbf\{([^}]+)\}/g, "$1")
+        .replace(/\\textit\{([^}]+)\}/g, "$1")
+        .replace(/\\\\/g, "\n")
+        .replace(/\\[a-zA-Z]+(\{[^}]*\})*|\{|\}/g, "")
+        .replace(/\n\s*\n/g, "\n\n")
+        .trim();
+    }
+    
     // Return the response data
     return {
-      resumeText: data.resume || "",
+      resumeText: plainTextResume || data.resume || "",
       resumeLatex: data.resumeLatex || "",
       profileData: userProfile
     };
