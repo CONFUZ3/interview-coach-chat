@@ -1,3 +1,4 @@
+
 import AppLayout from "@/components/Layout/AppLayout";
 import ChatInterface from "@/components/Chat/ChatInterface";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";

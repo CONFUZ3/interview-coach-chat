@@ -19,9 +19,10 @@ export type MessageType = {
 
 interface ChatInterfaceProps {
   mode: "resume" | "interview";
+  userProfile?: any; // Add this prop to the interface
 }
 
-export default function ChatInterface({ mode }: ChatInterfaceProps) {
+export default function ChatInterface({ mode, userProfile }: ChatInterfaceProps) {
   const {
     messages,
     isProcessing,

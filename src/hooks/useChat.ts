@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -13,12 +12,12 @@ import type { MessageType } from "@/components/Chat/ChatInterface";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
 
-export function useChat(mode: "resume" | "interview") {
+export function useChat(mode: "resume" | "interview", externalProfile?: ProfileData) {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [profileData, setProfileData] = useState<ProfileData | null>(externalProfile || null);
+  const [isProfileLoading, setIsProfileLoading] = useState(!externalProfile);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -63,8 +62,15 @@ export function useChat(mode: "resume" | "interview") {
     }
   }, [sessionData, isSessionLoading, navigate, toast]);
 
-  // Fetch user profile data
+  // Fetch user profile data if not provided externally
   useEffect(() => {
+    if (externalProfile) {
+      // If profile is provided externally, use it directly
+      setProfileData(externalProfile);
+      setIsProfileLoading(false);
+      return;
+    }
+    
     if (sessionData?.session) {
       const fetchProfile = async () => {
         setIsProfileLoading(true);
@@ -89,7 +95,7 @@ export function useChat(mode: "resume" | "interview") {
       
       fetchProfile();
     }
-  }, [sessionData, toast]);
+  }, [sessionData, toast, externalProfile]);
 
   useEffect(() => {
     if (sessionData?.session) {
