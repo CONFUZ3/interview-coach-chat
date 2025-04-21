@@ -15,7 +15,7 @@ import { getUserProfile, saveResume, ProfileData } from "@/services/profileServi
 import { supabase } from "@/integrations/supabase/client";
 import { compileLatexToPDF, downloadLatexSource } from "@/services/latexService";
 import { generateResumeWithAI } from "@/services/resumeGenerationService";
-import { CheckCircle } from "lucide-react"; // FIX: ensure this icon is imported
+import { CheckCircle } from "lucide-react";
 
 const ResumeBuilderPage = () => {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -32,7 +32,6 @@ const ResumeBuilderPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check session first
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -49,8 +48,6 @@ const ResumeBuilderPage = () => {
     checkSession();
   }, [navigate, toast]);
 
-  // FIX: Ensure we use correct property 'resumeText'
-  
   useEffect(() => {
     const fetchProfile = async () => {
       setIsProfileLoading(true);
@@ -58,7 +55,6 @@ const ResumeBuilderPage = () => {
         const profile = await getUserProfile();
         if (profile) {
           setProfileData(profile);
-          // Initialize resume text from profile if available
           setPastedResumeText(profile.resumeText || "");
         } else {
           setPastedResumeText("");
@@ -91,9 +87,7 @@ const ResumeBuilderPage = () => {
     setIsLoading(true);
     setSaveSuccess(false);
     try {
-      // Use the pasted resume text if available
       const previousResumeText = pastedResumeText || profileData?.resumeText || "";
-      // Call the AI service with both job desc and pasted resume text
       const { resumeText, resumeLatex } = await generateResumeWithAI(
         jobDescription,
         previousResumeText
@@ -102,7 +96,6 @@ const ResumeBuilderPage = () => {
       setLatexSource(resumeLatex || "");
       setActiveTab("preview");
 
-      // Save the generated resume (as text) linked to this profile/user
       const success = await saveResume(resumeText, jobTitle, company);
       if (success) {
         setSaveSuccess(true);
@@ -367,35 +360,36 @@ const ResumeBuilderPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TabsContent value="editor" className="mt-0">
-                <Textarea 
-                  value={resumeContent}
-                  onChange={(e) => {
-                    setResumeContent(e.target.value);
-                    setSaveSuccess(false);
-                  }}
-                  placeholder="Your generated resume will appear here..."
-                  className="min-h-[400px] font-mono text-sm"
-                />
-              </TabsContent>
-              <TabsContent value="preview" className="mt-0">
-                <div className="border rounded-md p-4 min-h-[400px] whitespace-pre-wrap">
-                  {resumeContent ? (
-                    <div className="prose dark:prose-invert max-w-none">
-                      {resumeContent.split('\n').map((line, i) => (
-                        <div key={i} className={line.trim() === '' ? 'my-3' : ''}>
-                          {line}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-muted-foreground text-center py-10">
-                      <FileText className="mx-auto h-10 w-10 mb-2 opacity-20" />
-                      <p>Generate a resume to preview it here</p>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
+              <div className="relative">
+                {activeTab === "editor" ? (
+                  <Textarea 
+                    value={resumeContent}
+                    onChange={(e) => {
+                      setResumeContent(e.target.value);
+                      setSaveSuccess(false);
+                    }}
+                    placeholder="Your generated resume will appear here..."
+                    className="min-h-[400px] font-mono text-sm"
+                  />
+                ) : (
+                  <div className="border rounded-md p-4 min-h-[400px] whitespace-pre-wrap">
+                    {resumeContent ? (
+                      <div className="prose dark:prose-invert max-w-none">
+                        {resumeContent.split('\n').map((line, i) => (
+                          <div key={i} className={line.trim() === '' ? 'my-3' : ''}>
+                            {line}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground text-center py-10">
+                        <FileText className="mx-auto h-10 w-10 mb-2 opacity-20" />
+                        <p>Generate a resume to preview it here</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
             <CardFooter className="justify-end space-x-2">
               <Button
