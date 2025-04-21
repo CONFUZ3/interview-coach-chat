@@ -1,73 +1,52 @@
 
-// We can't modify this file directly as it's marked read-only in the allowed-files list.
-// Instead, let's create a sidebar navigation component that we can use
+import React, { useState } from "react";
+import {
+  SidebarProvider, 
+  Sidebar, 
+  SidebarContent,
+  SidebarTrigger,
+  SidebarHeader,
+  SidebarFooter
+} from "@/components/ui/sidebar";
+import SidebarNav from "./SidebarNav";
 
-<lov-write file_path="src/components/Layout/SidebarNav.tsx">
-import { Link, useLocation } from "react-router-dom";
-import { 
-  Home, 
-  FileText, 
-  MessageSquare, 
-  UserCircle, 
-  FilePlus
-} from "lucide-react";
-
-interface SidebarNavProps {
-  closeMenu?: () => void;
+interface AppLayoutProps {
+  children: React.ReactNode;
 }
 
-export default function SidebarNav({ closeMenu }: SidebarNavProps) {
-  const location = useLocation();
-  
-  const navItems = [
-    { 
-      path: '/dashboard', 
-      label: 'Dashboard', 
-      icon: <Home className="h-4 w-4 mr-2" /> 
-    },
-    { 
-      path: '/resume', 
-      label: 'Career Coach', 
-      icon: <MessageSquare className="h-4 w-4 mr-2" /> 
-    },
-    { 
-      path: '/resume-builder', 
-      label: 'Resume Builder', 
-      icon: <FilePlus className="h-4 w-4 mr-2" /> 
-    },
-    { 
-      path: '/interview', 
-      label: 'Interview Prep', 
-      icon: <FileText className="h-4 w-4 mr-2" /> 
-    },
-    { 
-      path: '/profile', 
-      label: 'Profile', 
-      icon: <UserCircle className="h-4 w-4 mr-2" /> 
-    }
-  ];
-  
-  const handleClick = () => {
-    if (closeMenu) closeMenu();
-  };
-  
+const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+  const [open, setOpen] = useState(true);
+
   return (
-    <nav className="space-y-1 w-full">
-      {navItems.map((item) => (
-        <Link
-          key={item.path}
-          to={item.path}
-          onClick={handleClick}
-          className={`flex items-center px-3 py-2 rounded-md text-sm transition-colors w-full
-            ${location.pathname === item.path 
-              ? 'bg-accent text-accent-foreground font-medium' 
-              : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
-            }`}
-        >
-          {item.icon}
-          {item.label}
-        </Link>
-      ))}
-    </nav>
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex h-screen w-full">
+        <Sidebar>
+          <SidebarHeader className="border-b">
+            <div className="flex h-14 items-center px-4">
+              <h1 className="text-lg font-semibold">Career Coach AI</h1>
+            </div>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarNav />
+          </SidebarContent>
+          <SidebarFooter className="border-t py-2">
+            <div className="flex justify-center">
+              <span className="text-xs text-muted-foreground">© {new Date().getFullYear()} Career Coach AI</span>
+            </div>
+          </SidebarFooter>
+        </Sidebar>
+        <div className="flex-1 overflow-auto">
+          <div className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px]">
+            <SidebarTrigger />
+            <div className="w-full">
+              <h2 className="text-lg font-semibold">Career AI Platform</h2>
+            </div>
+          </div>
+          <main>{children}</main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
-}
+};
+
+export default AppLayout;
