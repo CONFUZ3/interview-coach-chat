@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -7,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, CheckCircle } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import { getUserProfile, saveUserProfile, ProfileData } from "@/services/profileService";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -16,11 +15,9 @@ export default function ProfileForm() {
     fullName: "",
     email: "",
     phone: "",
+    resumeText: ""
   });
   
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -37,16 +34,18 @@ export default function ProfileForm() {
           navigate('/');
           return;
         }
-        
         const profileData = await getUserProfile();
         if (profileData) {
           setProfile(profileData);
-          console.log("Loaded profile data:", profileData);
         } else {
-          console.log("No profile data found, using defaults");
+          setProfile({
+            fullName: "",
+            email: "",
+            phone: "",
+            resumeText: ""
+          });
         }
       } catch (error) {
-        console.error("Error fetching profile:", error);
         toast({
           title: "Error",
           description: "Failed to load your profile. Please try again.",
@@ -56,78 +55,24 @@ export default function ProfileForm() {
         setIsFetching(false);
       }
     }
-    
     fetchProfile();
   }, [navigate, toast]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUploadError(null);
-    setUploadStatus(null);
-    setSaveSuccess(false);
-    
-    if (!e.target.files || e.target.files.length === 0) {
-      return;
-    }
-    
-    const file = e.target.files[0];
-    
-    // Check file type
-    const validTypes = [
-      'application/pdf', 
-      'text/plain', 
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword',
-      'application/x-latex',
-      'application/octet-stream'
-    ];
-    
-    const fileExt = file.name.split('.').pop()?.toLowerCase();
-    const isValidExt = ['pdf', 'doc', 'docx', 'txt', 'tex'].includes(fileExt || '');
-    
-    if (!validTypes.includes(file.type) && !isValidExt) {
-      setUploadError("Please upload a PDF, DOC, DOCX, TXT or LaTeX file");
-      return;
-    }
-    
-    setIsUploading(true);
-    
-    try {
-      if (file.type === 'text/plain' || fileExt === 'txt' || fileExt === 'tex') {
-        const text = await file.text();
-        setProfile(prev => ({
-          ...prev,
-          resumeText: text
-        }));
-        setUploadStatus(`Resume uploaded: ${file.name}`);
-      } else {
-        setProfile(prev => ({
-          ...prev,
-          resumeText: `Previous resume uploaded: ${file.name}`
-        }));
-        setUploadStatus(`Resume uploaded: ${file.name}`);
-      }
-    } catch (error) {
-      console.error("Error reading file:", error);
-      setUploadError("Error reading the file. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  // Remove file upload logic completely, use textarea instead
 
   const handleSaveProfile = async () => {
     setIsLoading(true);
     setSaveSuccess(false);
-    
+
     try {
       const success = await saveUserProfile(profile);
-      
+
       if (success) {
         setSaveSuccess(true);
         toast({
           title: "Profile saved",
           description: "Your profile has been updated successfully.",
         });
-        // Don't navigate away automatically - show success state instead
       } else {
         toast({
           title: "Error saving profile",
@@ -136,7 +81,6 @@ export default function ProfileForm() {
         });
       }
     } catch (error) {
-      console.error("Error saving profile:", error);
       toast({
         title: "Error saving profile",
         description: "There was an error saving your profile. Please try again.",
@@ -163,7 +107,7 @@ export default function ProfileForm() {
       <CardHeader>
         <CardTitle>Profile Information</CardTitle>
         <CardDescription>
-          Enter your basic information and upload your existing resume to get started.
+          Enter your basic information and paste your resume text below.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -177,7 +121,6 @@ export default function ProfileForm() {
               placeholder="John Doe"
             />
           </div>
-          
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">Email</label>
             <Input 
@@ -188,7 +131,6 @@ export default function ProfileForm() {
               placeholder="john.doe@example.com"
             />
           </div>
-          
           <div className="space-y-2">
             <label htmlFor="phone" className="text-sm font-medium">Phone Number</label>
             <Input 
@@ -199,49 +141,19 @@ export default function ProfileForm() {
               placeholder="(123) 456-7890"
             />
           </div>
-        </div>
-        
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Input
-              type="file"
-              accept=".pdf,.doc,.docx,.txt,.tex"
-              id="resume-upload"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={isUploading}
+          <div className="space-y-2">
+            <label htmlFor="resumeText" className="text-sm font-medium">Resume Text</label>
+            <Textarea
+              id="resumeText"
+              value={profile.resumeText || ""}
+              onChange={(e) => setProfile(prev => ({ ...prev, resumeText: e.target.value }))}
+              placeholder="Paste your resume text here. This will help the AI personalize your experience and generate resumes tailored to you."
+              className="min-h-[150px] resize-y"
             />
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => document.getElementById("resume-upload")?.click()}
-              disabled={isUploading}
-            >
-              {isUploading ? (
-                <>
-                  <Spinner className="mr-2 h-4 w-4" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Previous Resume
-                </>
-              )}
-            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              Paste your full resume text so your advice and generated resumes are based on your real strengths!
+            </p>
           </div>
-          
-          {uploadStatus && (
-            <Alert className="mt-2 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-              <AlertDescription className="text-green-700 dark:text-green-400">{uploadStatus}</AlertDescription>
-            </Alert>
-          )}
-          
-          {uploadError && (
-            <Alert variant="destructive" className="mt-2">
-              <AlertDescription>{uploadError}</AlertDescription>
-            </Alert>
-          )}
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">

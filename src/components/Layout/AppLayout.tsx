@@ -1,4 +1,3 @@
-
 import { ReactNode, useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { 
@@ -55,12 +54,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const navLinks = [
     {
       name: "Resume Builder",
-      path: "/resume",
+      path: "/resume-builder",
       icon: FileText,
     },
     {
       name: "Mock Interview",
       path: "/interview",
+      icon: MessageSquare,
+    },
+    {
+      name: "Career Coach",
+      path: "/resume",
       icon: MessageSquare,
     },
     {

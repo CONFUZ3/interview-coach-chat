@@ -1,4 +1,3 @@
-
 import AppLayout from "@/components/Layout/AppLayout";
 import ChatInterface from "@/components/Chat/ChatInterface";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
@@ -11,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 const ResumePage = () => {
   const [userName, setUserName] = useState<string | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -18,13 +18,13 @@ const ResumePage = () => {
       try {
         const profile = await getUserProfile();
         if (profile && profile.fullName) {
-          setUserName(profile.fullName.split(' ')[0]); // Get first name
+          setUserName(profile.fullName.split(' ')[0]);
+          setProfile(profile);
         }
       } catch (error) {
         console.error("Failed to fetch profile:", error);
       }
     };
-    
     fetchProfile();
   }, [toast]);
 
@@ -43,7 +43,6 @@ const ResumePage = () => {
             <MessageSquare className="h-3 w-3 mr-1" /> AI Powered
           </Badge>
         </div>
-        
         <Alert className="mb-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
           <Info className="h-4 w-4 text-blue-500" />
           <AlertTitle className="text-sm">How to Use the Career Coach</AlertTitle>
@@ -51,7 +50,6 @@ const ResumePage = () => {
             Ask about interview tips, resume improvement, career transitions, or any other career-related questions. The AI coach will provide personalized guidance based on your profile and industry best practices.
           </AlertDescription>
         </Alert>
-        
         <Card className="mb-2 bg-accent/50">
           <CardContent className="py-2">
             <CardDescription className="flex gap-2 text-xs text-center justify-center">
@@ -59,9 +57,8 @@ const ResumePage = () => {
             </CardDescription>
           </CardContent>
         </Card>
-        
         <div className="flex-1 flex flex-col border rounded-lg overflow-hidden bg-card">
-          <ChatInterface mode="resume" />
+          <ChatInterface mode="resume" userProfile={profile} />
         </div>
       </div>
     </AppLayout>

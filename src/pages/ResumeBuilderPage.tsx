@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/Layout/AppLayout";
@@ -11,11 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
-import { Info, FileText, Download, Copy, ArrowRight, UserCog, CheckCircle } from "lucide-react";
+import { Info, FileText, Download, Copy, ArrowRight, UserCog } from "lucide-react";
 import { getUserProfile, saveResume, ProfileData } from "@/services/profileService";
 import { supabase } from "@/integrations/supabase/client";
 import { compileLatexToPDF, downloadLatexSource } from "@/services/latexService";
 import { generateResumeWithAI } from "@/services/resumeGenerationService";
+import { CheckCircle } from "lucide-react"; // FIX: ensure this icon is imported
 
 const ResumeBuilderPage = () => {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -49,24 +49,23 @@ const ResumeBuilderPage = () => {
     checkSession();
   }, [navigate, toast]);
 
-  // Fetch user profile data
+  // FIX: Ensure we use correct property 'resumeText'
+  
   useEffect(() => {
     const fetchProfile = async () => {
       setIsProfileLoading(true);
       try {
         const profile = await getUserProfile();
         if (profile) {
-          console.log("Profile loaded for resume builder");
           setProfileData(profile);
           // Initialize resume text from profile if available
-          if (profile.resumeText) {
-            setPastedResumeText(profile.resumeText);
-          }
+          setPastedResumeText(profile.resumeText || "");
         } else {
-          console.log("No profile data found");
+          setPastedResumeText("");
         }
       } catch (error) {
-        console.error("Failed to fetch profile:", error);
+        setProfileData(null);
+        setPastedResumeText("");
         toast({
           title: "Error",
           description: "Failed to load your profile. Please try again.",
@@ -76,7 +75,6 @@ const ResumeBuilderPage = () => {
         setIsProfileLoading(false);
       }
     };
-    
     fetchProfile();
   }, [toast]);
 
@@ -94,19 +92,18 @@ const ResumeBuilderPage = () => {
     setSaveSuccess(false);
     try {
       // Use the pasted resume text if available
-      const previousResumeText = pastedResumeText || profileData?.resumeText;
-      
-      // Use the generateResumeWithAI service
-      const { resumeText, resumeLatex, profileData: updatedProfile } = await generateResumeWithAI(jobDescription, previousResumeText);
-      
+      const previousResumeText = pastedResumeText || profileData?.resumeText || "";
+      // Call the AI service with both job desc and pasted resume text
+      const { resumeText, resumeLatex } = await generateResumeWithAI(
+        jobDescription,
+        previousResumeText
+      );
       setResumeContent(resumeText || "");
       setLatexSource(resumeLatex || "");
       setActiveTab("preview");
-      
-      // Save the generated resume to the database
-      console.log("Saving generated resume");
+
+      // Save the generated resume (as text) linked to this profile/user
       const success = await saveResume(resumeText, jobTitle, company);
-      
       if (success) {
         setSaveSuccess(true);
         toast({
@@ -114,9 +111,7 @@ const ResumeBuilderPage = () => {
           description: "Your resume has been generated and saved successfully.",
         });
       }
-
     } catch (error) {
-      console.error("Error generating resume:", error);
       toast({
         title: "Error",
         description: "Failed to generate resume. Please try again.",
@@ -136,28 +131,21 @@ const ResumeBuilderPage = () => {
       });
       return;
     }
-    
     try {
       toast({
         title: "Preparing PDF",
         description: "Your resume is being formatted as PDF...",
       });
-      
       let pdfBlob;
-      
       if (latexSource) {
-        // Use LaTeX compiler if we have LaTeX source
         pdfBlob = await compileLatexToPDF(latexSource);
       } else {
-        // Fallback to basic PDF generation
         toast({
           title: "Using basic formatting",
           description: "LaTeX source not available, using simplified PDF formatting.",
         });
         return;
       }
-      
-      // Create download link
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement("a");
       a.href = url;
@@ -166,13 +154,11 @@ const ResumeBuilderPage = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
       toast({
         title: "PDF Downloaded",
         description: "Your resume has been downloaded successfully.",
       });
     } catch (error) {
-      console.error("Error generating PDF:", error);
       toast({
         title: "Error",
         description: "Failed to generate PDF. Please try again.",
@@ -190,17 +176,14 @@ const ResumeBuilderPage = () => {
       });
       return;
     }
-    
     try {
       const filename = `resume-${jobTitle.toLowerCase().replace(/\s+/g, '-')}.tex`;
       downloadLatexSource(latexSource, filename);
-      
       toast({
         title: "LaTeX Downloaded",
         description: "Your resume LaTeX source has been downloaded successfully.",
       });
     } catch (error) {
-      console.error("Error downloading LaTeX:", error);
       toast({
         title: "Error",
         description: "Failed to download LaTeX source. Please try again.",
@@ -279,7 +262,6 @@ const ResumeBuilderPage = () => {
             Create professional resumes tailored to specific job descriptions using AI
           </p>
         </div>
-
         <Alert className="mb-6 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
           <Info className="h-4 w-4 text-blue-500" />
           <AlertTitle className="text-sm">How to Use the Resume Builder</AlertTitle>
@@ -288,7 +270,6 @@ const ResumeBuilderPage = () => {
             For better results, first use the Career Coach AI to get advice on your resume content.
           </AlertDescription>
         </Alert>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -307,7 +288,6 @@ const ResumeBuilderPage = () => {
                   placeholder="Software Engineer, Project Manager, etc."
                 />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="company">Company</Label>
                 <Input 
@@ -317,7 +297,6 @@ const ResumeBuilderPage = () => {
                   placeholder="Company name"
                 />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="previousResume">Previous Resume</Label>
                 <Textarea
@@ -331,7 +310,6 @@ const ResumeBuilderPage = () => {
                   Paste your existing resume to help the AI better understand your experience and skills
                 </p>
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="jobDescription">Job Description</Label>
                 <Textarea 
@@ -373,7 +351,6 @@ const ResumeBuilderPage = () => {
               </Button>
             </CardFooter>
           </Card>
-
           <Card>
             <CardHeader className="space-y-1">
               <div className="flex justify-between items-center">
