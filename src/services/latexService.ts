@@ -6,7 +6,7 @@ import * as latexjs from "latex.js";
 // This function uses latex.js to properly compile LaTeX to PDF
 export async function compileLatexToPDF(latexCode: string): Promise<Blob> {
   try {
-    // First method: Try to use latex.js for proper LaTeX compilation
+    // First method: Use latex.js for proper LaTeX compilation
     try {
       const generator = new latexjs.HtmlGenerator({ hyphenate: false });
       const document = latexjs.parse(latexCode, { generator: generator });
@@ -37,29 +37,9 @@ export async function compileLatexToPDF(latexCode: string): Promise<Blob> {
       
       return doc.output("blob");
     } catch (latexError) {
-      console.warn("LaTeX.js compilation failed, trying online service", latexError);
-      
-      // Second method: Try to use an online LaTeX compilation service
-      try {
-        const response = await fetch("https://latexonline.cc/compile", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: `code=${encodeURIComponent(latexCode)}`,
-          signal: AbortSignal.timeout(15000), // 15 seconds timeout
-        });
-
-        if (response.ok) {
-          return await response.blob();
-        }
-      } catch (serviceError) {
-        console.warn("LaTeX online service failed, trying fallback method", serviceError);
-      }
+      console.warn("LaTeX.js compilation failed, trying fallback method", latexError);
+      return generateEnhancedPDF(latexCode);
     }
-
-    // Fallback: Enhanced PDF rendering with better LaTeX-like formatting
-    return generateEnhancedPDF(latexCode);
   } catch (error) {
     console.error("Error compiling LaTeX:", error);
     return generateBasicPDF(latexCode);

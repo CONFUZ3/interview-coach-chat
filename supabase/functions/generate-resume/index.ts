@@ -1,3 +1,4 @@
+
 // This is the Supabase Edge Function that generates resumes using the Gemini API
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -7,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Enhanced LaTeX template that fully follows the requested format
+// The exact LaTeX template provided by the user
 const LATEX_TEMPLATE = `\\documentclass[letterpaper,11pt]{article}
 
 \\usepackage{latexsym}
@@ -23,6 +24,7 @@ const LATEX_TEMPLATE = `\\documentclass[letterpaper,11pt]{article}
 \\usepackage{tabularx}
 \\input{glyphtounicode}
 
+
 %----------FONT OPTIONS----------
 % sans-serif
 % \\usepackage[sfdefault]{FiraSans}
@@ -33,6 +35,7 @@ const LATEX_TEMPLATE = `\\documentclass[letterpaper,11pt]{article}
 % serif
 % \\usepackage{CormorantGaramond}
 % \\usepackage{charter}
+
 
 \\pagestyle{fancy}
 \\fancyhf{} % clear all header and footer fields
@@ -101,8 +104,7 @@ const LATEX_TEMPLATE = `\\documentclass[letterpaper,11pt]{article}
 \\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
 
 %-------------------------------------------
-%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-`;
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%`;
 
 // Function to escape special LaTeX characters in user input
 function escapeLatex(text: string): string {
@@ -185,8 +187,8 @@ serve(async (req) => {
       [
         escapeLatex(phone),
         email ? `\\href{mailto:${escapeLatex(email)}}{\\underline{${escapeLatex(email)}}}` : "",
-        linkedin ? `\\href{${escapeLatex(linkedin)}}{\\underline{${escapeLatex(linkedin.replace(/https?:\/\/(www\.)?/i, ''))}}` : "",
-        github ? `\\href{${escapeLatex(github)}}{\\underline{${escapeLatex(github.replace(/https?:\/\/(www\.)?/i, ''))}}` : "",
+        linkedin ? `\\href{${escapeLatex(linkedin)}}{\\underline{${escapeLatex(linkedin.replace(/https?:\/\/(www\.)?/i, ''))}}}` : "",
+        github ? `\\href{${escapeLatex(github)}}{\\underline{${escapeLatex(github.replace(/https?:\/\/(www\.)?/i, ''))}}}` : "",
       ]
         .filter(Boolean)
         .join(" $|$ ");
@@ -195,20 +197,19 @@ serve(async (req) => {
     const prompt = `
 You are an expert LaTeX formatter specializing in professional resumes. Generate a complete, fully-compilable LaTeX resume using only the template provided.
 
-**Must-Keep Formatting and Structure:**
-- Use this template exactly as provided:
+**Required Structure and Content:**
+- Generate a proper LaTeX resume using this template:
 ${LATEX_TEMPLATE}
 
-- The output must:
-  - Include \\begin{document} and end with \\end{document}
-  - Be 100% pure valid LaTeX with no extra explanations or comments
-  - Be ATS-friendly formatted
-  - Include a Career Summary section
-  - Include all necessary sections formatted according to the template
-  - Follow the exact style of the provided template
-  - NEVER write "STAR technique" or similar in your output
+- The output MUST:
+  - Begin with \\begin{document}
+  - End with \\end{document}
+  - Be 100% compilable LaTeX with NO comments or explanations
+  - Include a "Career Summary" section at the beginning
+  - Follow the exact formatting style from the template
+  - Use the exact command structure shown in the template (resumeSubHeadingListStart, resumeItem, etc.)
 
-**Structure your LaTeX resume as follows:**
+**LaTeX Resume Structure:**
 
 \\begin{document}
 
@@ -218,40 +219,41 @@ ${LATEX_TEMPLATE}
 \\end{center}
 
 1. \\section{Career Summary}
-  - Write a concise 2-3 line summary highlighting the candidate's background, expertise and motivation for the job.
-  - This section must be included and tailored to both the profile and job description.
+  - Add a concise 2-3 line professional summary tailored to the job description
+  - Use \\resumeItemListStart, \\resumeItem{...}, and \\resumeItemListEnd
 
 2. \\section{Education}
-  - List all degrees, schools, and dates in reverse chronological order using \\resumeSubHeadingListStart, \\resumeSubheading, and \\resumeSubHeadingListEnd.
+  - Format using \\resumeSubHeadingListStart and \\resumeSubheading command:
+    * \\resumeSubheading{School/University}{Location}{Degree}{Date Range}
 
 3. \\section{Experience}
-  - For each job, use the proper commands:
-    * \\resumeSubheading{Position}{Dates}{Company}{Location}
+  - For each job position:
+    * \\resumeSubheading{Position}{Date Range}{Company}{Location}
     * \\resumeItemListStart
-    * 3-5 accomplishments with \\resumeItem{...} 
+    * Use \\resumeItem{...} for each bullet point achievement 
     * \\resumeItemListEnd
 
-4. \\section{Projects} (if present in profile)
-  - Use \\resumeProjectHeading command for each project
+4. \\section{Projects} (if applicable)
+  - Format using \\resumeProjectHeading{Project Title | Technologies}{Date}
+  - List details with \\resumeItemListStart, \\resumeItem, and \\resumeItemListEnd
 
 5. \\section{Technical Skills}
-  - Format as itemized list categorized by skill type
+  - Use the format in the template with itemized lists organized by category
 
-**CANDIDATE PROFILE:**
+**Candidate Profile:**
 Name: ${escapeLatex(fullName)}
 Email: ${escapeLatex(email)}
 Phone: ${escapeLatex(phone)}
-Linkedin: ${escapeLatex(linkedin)}
-Github: ${escapeLatex(github)}
+${linkedin ? `LinkedIn: ${escapeLatex(linkedin)}` : ''}
+${github ? `GitHub: ${escapeLatex(github)}` : ''}
 
-Current Summary: ${escapeLatex(summary)}
-Resume Content:
-${escapeLatex(resumeText)}
+${summary ? `Current Summary: ${escapeLatex(summary)}` : ''}
+${resumeText ? `Resume Content: ${escapeLatex(resumeText)}` : ''}
 
-**FOR THE JOB BELOW, fully tailor the resume:**
+**Target Job:**
 ${escapeLatex(jobDescription)}
 
-Return ONLY valid LaTeX code. Ensure it matches EXACTLY the format in the example template.
+IMPORTANT: Return ONLY the compilable LaTeX code that matches EXACTLY the format in the template. Do not include any explanations or markdown formatting.
 `;
 
     console.log("Calling Gemini API with prompt");

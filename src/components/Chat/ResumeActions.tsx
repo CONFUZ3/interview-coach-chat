@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { DownloadCloud, FileText, FileBadge } from "lucide-react";
+import { DownloadCloud, FileText, Code } from "lucide-react";
 import ResumeUpload from "./ResumeUpload";
 
 interface ResumeActionsProps {
@@ -25,8 +25,8 @@ export default function ResumeActions({
     <div className="mb-3">
       <Tabs defaultValue="download" className="w-full">
         <TabsList className="grid grid-cols-2">
-          <TabsTrigger value="download">Download</TabsTrigger>
-          <TabsTrigger value="upload">Upload Previous Resume</TabsTrigger>
+          <TabsTrigger value="download">Downloads</TabsTrigger>
+          <TabsTrigger value="upload">Upload Resume</TabsTrigger>
         </TabsList>
         
         <TabsContent value="download" className="space-y-2 py-2">
@@ -35,16 +35,20 @@ export default function ResumeActions({
               <Button
                 variant="outline"
                 onClick={onDownloadPDF}
+                className="flex items-center"
               >
-                <DownloadCloud className="h-4 w-4 mr-1" /> Download as PDF
+                <DownloadCloud className="h-4 w-4 mr-2" /> 
+                Download PDF
               </Button>
               
               {isLatex && onDownloadLatex && (
                 <Button
                   variant="outline"
                   onClick={onDownloadLatex}
+                  className="flex items-center"
                 >
-                  <FileText className="h-4 w-4 mr-1" /> Download LaTeX Source
+                  <Code className="h-4 w-4 mr-2" /> 
+                  Download LaTeX Source
                 </Button>
               )}
             </div>
