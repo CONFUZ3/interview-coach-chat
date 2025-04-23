@@ -7,9 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// LaTeX template based on the provided Python code
-const LATEX_TEMPLATE = `
-\\documentclass[letterpaper,11pt]{article}
+// Enhanced LaTeX template that fully follows the requested format
+const LATEX_TEMPLATE = `\\documentclass[letterpaper,11pt]{article}
 
 \\usepackage{latexsym}
 \\usepackage[empty]{fullpage}
@@ -59,7 +58,7 @@ const LATEX_TEMPLATE = `
   \\vspace{-4pt}\\scshape\\raggedright\\large
 }{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]
 
-% Ensure PDF is machine readable/ATS parsable
+% Ensure that generate pdf is machine readable/ATS parsable
 \\pdfgentounicode=1
 
 %-------------------------
@@ -100,6 +99,9 @@ const LATEX_TEMPLATE = `
 \\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}
 \\newcommand{\\resumeItemListStart}{\\begin{itemize}}
 \\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 `;
 
 // Function to escape special LaTeX characters in user input
@@ -175,7 +177,7 @@ serve(async (req) => {
     let phone = userProfile?.phone || "(123) 456-7890";
     let linkedin = userProfile?.linkedin || "";
     let github = userProfile?.github || "";
-    let summary = userProfile?.summary || ""; // Expecting a "summary" or similar field for career/professional summary
+    let summary = userProfile?.summary || "";
     let resumeText = previousResume || userProfile?.resumeText || "";
 
     // Combine links nicely
@@ -183,55 +185,59 @@ serve(async (req) => {
       [
         escapeLatex(phone),
         email ? `\\href{mailto:${escapeLatex(email)}}{\\underline{${escapeLatex(email)}}}` : "",
-        linkedin ? `\\href{${escapeLatex(linkedin)}}{\\underline{${escapeLatex(linkedin)}}}` : "",
-        github ? `\\href{${escapeLatex(github)}}{\\underline{${escapeLatex(github)}}}` : "",
+        linkedin ? `\\href{${escapeLatex(linkedin)}}{\\underline{${escapeLatex(linkedin.replace(/https?:\/\/(www\.)?/i, ''))}}` : "",
+        github ? `\\href{${escapeLatex(github)}}{\\underline{${escapeLatex(github.replace(/https?:\/\/(www\.)?/i, ''))}}` : "",
       ]
         .filter(Boolean)
         .join(" $|$ ");
 
-    // PROMPT for Gemini LLM:
+    // PROMPT for Gemini LLM with enhanced instructions for proper LaTeX:
     const prompt = `
 You are an expert LaTeX formatter specializing in professional resumes. Generate a complete, fully-compilable LaTeX resume using only the template provided.
 
-**Must-Keep Formatting and Sections (do NOT deviate):**
-- Use this template exactly:
+**Must-Keep Formatting and Structure:**
+- Use this template exactly as provided:
 ${LATEX_TEMPLATE}
 
 - The output must:
-  - Start with \\begin{document} and end with \\end{document}
-  - BE 100% pure valid LaTeX with no extra explanations or comments.
-  - Use the AT&T/ATS-friendly format.
-  - INLCUDE ALL recommended \section{} and command styles. Add any new custom commands you need only using the pattern style in the template.
-  - NEVER write "STAR technique" or similar in your output.
-  - Do not change the font or documentclass/geometry.
+  - Include \\begin{document} and end with \\end{document}
+  - Be 100% pure valid LaTeX with no extra explanations or comments
+  - Be ATS-friendly formatted
+  - Include a Career Summary section
+  - Include all necessary sections formatted according to the template
+  - Follow the exact style of the provided template
+  - NEVER write "STAR technique" or similar in your output
 
-**Populate the following sections & structure:**
+**Structure your LaTeX resume as follows:**
 
 \\begin{document}
+
 \\begin{center}
   \\textbf{\\Huge \\scshape ${escapeLatex(fullName)}} \\\\ \\vspace{1pt}
   \\small ${contactLine}
 \\end{center}
 
 1. \\section{Career Summary}
-  - Write a succinct, 2-5 line summary describing the candidate’s background, skills, industry, and motivation for the job.
-  - Base this summary on the data below and the job description. You *MUST* synthesize from both current profile, resume, and described skills.
+  - Write a concise 2-3 line summary highlighting the candidate's background, expertise and motivation for the job.
+  - This section must be included and tailored to both the profile and job description.
 
 2. \\section{Education}
-  - List all degrees, schools, and timeframes in most recent first order.
+  - List all degrees, schools, and dates in reverse chronological order using \\resumeSubHeadingListStart, \\resumeSubheading, and \\resumeSubHeadingListEnd.
 
 3. \\section{Experience}
-  - For each job, list:
-    * Title, Dates, Company, Location (using \\resumeSubheading)
-    * 2-5 resume bullet points (\\resumeItem), following STAR principles, tailored to the job.
+  - For each job, use the proper commands:
+    * \\resumeSubheading{Position}{Dates}{Company}{Location}
+    * \\resumeItemListStart
+    * 3-5 accomplishments with \\resumeItem{...} 
+    * \\resumeItemListEnd
 
-4. \\section{Projects} (optional; include if present)
-  - Major relevant academic/personal projects.
+4. \\section{Projects} (if present in profile)
+  - Use \\resumeProjectHeading command for each project
 
 5. \\section{Technical Skills}
-  - Group technical skills, frameworks, tools, and languages in neat lines.
+  - Format as itemized list categorized by skill type
 
-**CANDIDATE PROFILE (All values escaped for LaTeX):**
+**CANDIDATE PROFILE:**
 Name: ${escapeLatex(fullName)}
 Email: ${escapeLatex(email)}
 Phone: ${escapeLatex(phone)}
@@ -239,16 +245,13 @@ Linkedin: ${escapeLatex(linkedin)}
 Github: ${escapeLatex(github)}
 
 Current Summary: ${escapeLatex(summary)}
-Paste of previous resume/profile content (free text):
+Resume Content:
 ${escapeLatex(resumeText)}
 
 **FOR THE JOB BELOW, fully tailor the resume:**
-Job Description: 
 ${escapeLatex(jobDescription)}
 
-\\end{document}
-
-Return ONLY valid LaTeX code starting at \\documentclass.
+Return ONLY valid LaTeX code. Ensure it matches EXACTLY the format in the example template.
 `;
 
     console.log("Calling Gemini API with prompt");
@@ -285,32 +288,27 @@ Return ONLY valid LaTeX code starting at \\documentclass.
     if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
       latexContent = data.candidates[0].content.parts[0].text;
       
-      // Clean the LaTeX content to remove any non-LaTeX formatting that might have been included
+      // Clean the LaTeX content
+      latexContent = latexContent.replace(/```latex|```/g, ''); // Remove markdown code blocks
       latexContent = latexContent.replace(/\*\*/g, ''); // Remove markdown bold
       latexContent = latexContent.replace(/\*/g, '');   // Remove markdown italic
-      latexContent = latexContent.replace(/STAR technique/gi, ''); // Remove any STAR mentions
-      latexContent = latexContent.replace(/Using the STAR format/gi, ''); // Additional STAR mention cleanup
-      latexContent = latexContent.replace(/Situation, Task, Action, Result/gi, '');
       
-      // Extract only the LaTeX portion if needed
+      // Extract only the LaTeX portion
       const extracted = extractLatex(latexContent);
       if (extracted) {
         latexContent = extracted;
       } else if (!latexContent.trim().startsWith("\\documentclass")) {
-        // Try to find just the document part if we can't find the whole latex document
+        // Find document part
         const match = latexContent.match(/\\begin\{document\}.*?\\end\{document\}/s);
         if (match) {
           latexContent = LATEX_TEMPLATE + '\n' + match[0];
         }
       }
-    } else {
-      console.error("Unexpected response format:", JSON.stringify(data));
-      throw new Error("Unexpected response format from Gemini API");
     }
 
     console.log("LaTeX resume generated successfully");
     
-    // Return the generated LaTeX with profile data
+    // Return the generated LaTeX
     return new Response(
       JSON.stringify({ 
         resumeLatex: latexContent,

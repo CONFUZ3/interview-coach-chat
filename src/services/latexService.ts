@@ -1,43 +1,76 @@
 
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
+import * as latexjs from "latex.js";
 
-// This function uses a third-party service to compile LaTeX to PDF
+// This function uses latex.js to properly compile LaTeX to PDF
 export async function compileLatexToPDF(latexCode: string): Promise<Blob> {
   try {
-    // First method: Try to use an online LaTeX compilation service
+    // First method: Try to use latex.js for proper LaTeX compilation
     try {
-      // We'll try a fetch to a LaTeX compilation service
-      const response = await fetch("https://latexonline.cc/compile", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+      const generator = new latexjs.HtmlGenerator({ hyphenate: false });
+      const document = latexjs.parse(latexCode, { generator: generator });
+      
+      // Convert the HTML representation to PDF using jsPDF
+      const doc = new jsPDF();
+      const width = doc.internal.pageSize.getWidth();
+      const height = doc.internal.pageSize.getHeight();
+      
+      // Create a temporary element to render the HTML
+      const tempElement = document.domFragment();
+      const tempContainer = document.createElement('div');
+      tempContainer.appendChild(tempElement);
+      tempContainer.style.width = width + 'pt';
+      document.body.appendChild(tempContainer);
+      
+      // Capture the rendered LaTeX as PDF
+      doc.html(tempContainer, {
+        callback: function(pdf) {
+          // Clean up
+          document.body.removeChild(tempContainer);
         },
-        body: `code=${encodeURIComponent(latexCode)}`,
-        signal: AbortSignal.timeout(15000), // 15 seconds timeout
+        x: 0,
+        y: 0,
+        width: width,
+        windowWidth: width
       });
+      
+      return doc.output("blob");
+    } catch (latexError) {
+      console.warn("LaTeX.js compilation failed, trying online service", latexError);
+      
+      // Second method: Try to use an online LaTeX compilation service
+      try {
+        const response = await fetch("https://latexonline.cc/compile", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: `code=${encodeURIComponent(latexCode)}`,
+          signal: AbortSignal.timeout(15000), // 15 seconds timeout
+        });
 
-      if (response.ok) {
-        return await response.blob();
+        if (response.ok) {
+          return await response.blob();
+        }
+      } catch (serviceError) {
+        console.warn("LaTeX online service failed, trying fallback method", serviceError);
       }
-    } catch (serviceError) {
-      console.warn("LaTeX online service failed, trying fallback method", serviceError);
     }
 
-    // Fallback: Basic PDF rendering with LaTeX-like formatting
-    return generateBasicPDF(latexCode);
+    // Fallback: Enhanced PDF rendering with better LaTeX-like formatting
+    return generateEnhancedPDF(latexCode);
   } catch (error) {
     console.error("Error compiling LaTeX:", error);
     return generateBasicPDF(latexCode);
   }
 }
 
-// Fallback function that creates a basic PDF from LaTeX code
-function generateBasicPDF(latexCode: string): Blob {
+// Enhanced fallback function that creates a better LaTeX-styled PDF
+function generateEnhancedPDF(latexCode: string): Blob {
   const doc = new jsPDF();
   
-  // Extract the content from the LaTeX code
-  const content = extractContentFromLatex(latexCode);
+  // Parse the LaTeX content more thoroughly
   const parsedContent = parseLatexContent(latexCode);
   
   // Check if we successfully parsed content
@@ -88,42 +121,53 @@ function generateBasicPDF(latexCode: string): Blob {
         yPosition += 2;
       }
     }
+    return doc.output("blob");
   } else {
     // Fallback to basic extraction if parsing fails
-    doc.text("Resume", 105, 15, { align: "center" });
-    doc.setFontSize(12);
-    
-    const textLines = content.split("\n").filter(line => line.trim() !== "");
-    let y = 25;
-    
-    textLines.forEach(line => {
-      if (line.startsWith("\\section") || line.startsWith("\\subsection")) {
-        y += 5;
-        doc.setFont("helvetica", "bold");
-        const sectionName = line.match(/\{([^}]+)\}/)?.[1] || "";
-        doc.text(sectionName, 20, y);
-        doc.setFont("helvetica", "normal");
-        y += 5;
-      } else {
-        const processedLine = line
-          .replace(/\\textbf\{([^}]+)\}/g, "$1")
-          .replace(/\\textit\{([^}]+)\}/g, "$1")
-          .replace(/\\\\/, "")
-          .replace(/\\item/, "•")
-          .replace(/\{|\}/g, "");
-        
-        if (processedLine.trim() !== "") {
-          doc.text(processedLine, 20, y);
-          y += 5;
-        }
-      }
-      
-      if (y > 280) {
-        doc.addPage();
-        y = 20;
-      }
-    });
+    return generateBasicPDF(latexCode);
   }
+}
+
+// Basic fallback function if all else fails
+function generateBasicPDF(latexCode: string): Blob {
+  const doc = new jsPDF();
+  
+  // Extract the content from the LaTeX code
+  const content = extractContentFromLatex(latexCode);
+  
+  doc.text("Resume", 105, 15, { align: "center" });
+  doc.setFontSize(12);
+  
+  const textLines = content.split("\n").filter(line => line.trim() !== "");
+  let y = 25;
+  
+  textLines.forEach(line => {
+    if (line.startsWith("\\section") || line.startsWith("\\subsection")) {
+      y += 5;
+      doc.setFont("helvetica", "bold");
+      const sectionName = line.match(/\{([^}]+)\}/)?.[1] || "";
+      doc.text(sectionName, 20, y);
+      doc.setFont("helvetica", "normal");
+      y += 5;
+    } else {
+      const processedLine = line
+        .replace(/\\textbf\{([^}]+)\}/g, "$1")
+        .replace(/\\textit\{([^}]+)\}/g, "$1")
+        .replace(/\\\\/, "")
+        .replace(/\\item/, "•")
+        .replace(/\{|\}/g, "");
+      
+      if (processedLine.trim() !== "") {
+        doc.text(processedLine, 20, y);
+        y += 5;
+      }
+    }
+    
+    if (y > 280) {
+      doc.addPage();
+      y = 20;
+    }
+  });
   
   return doc.output("blob");
 }
