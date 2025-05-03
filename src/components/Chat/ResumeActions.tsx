@@ -4,6 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DownloadCloud, FileText, Code } from "lucide-react";
 import ResumeUpload from "./ResumeUpload";
 import { saveUserProfile, getUserProfile } from "@/services/profileService";
+import { compileLatexToPDF, downloadLatexSource } from "@/services/latexService";
 import { useToast } from "@/components/ui/use-toast";
 import { useState } from "react";
 

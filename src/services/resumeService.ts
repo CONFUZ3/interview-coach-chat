@@ -4,6 +4,7 @@ import { createConversation, saveMessage, getConversationMessages, getUserConver
 import { generateResumeWithAI } from "./resumeGenerationService";
 import { compileLatexToPDF, downloadLatexSource } from "./latexService";
 import { saveResume, getUserResumes } from "./profileService";
+import { generatePDF } from "./pdfService";
 
 export { 
   getUserProfile,
@@ -16,7 +17,8 @@ export {
   compileLatexToPDF,
   downloadLatexSource,
   saveResume,
-  getUserResumes
+  getUserResumes,
+  generatePDF
 };
 
 export type { ProfileData } from "./profileService";

@@ -86,10 +86,12 @@ serve(async (req) => {
     if (messages && messages.length > 0) {
       console.log(`Loading ${messages.length} previous messages into memory`);
       for (const msg of messages) {
-        await memory.saveContext(
-          { input: msg.content },
-          { output: msg.type === 'ai' ? msg.content : '' }
-        );
+        if (msg.type === 'user' || msg.type === 'ai') {
+          await memory.saveContext(
+            { input: msg.type === 'user' ? msg.content : '' },
+            { output: msg.type === 'ai' ? msg.content : '' }
+          );
+        }
       }
     }
 

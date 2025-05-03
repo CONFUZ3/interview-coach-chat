@@ -3,8 +3,7 @@ import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 
 /**
- * Improved LaTeX to PDF converter using PDF.js
- * This approach focuses on properly handling LaTeX tabular environments
+ * Improved LaTeX to PDF converter that better handles tabular environments
  */
 export async function compileLatexToPDF(latexCode: string): Promise<Blob> {
   try {
@@ -51,7 +50,7 @@ export async function compileLatexToPDF(latexCode: string): Promise<Blob> {
         if (item.type === "subheading") {
           // Handle subheadings (e.g., education/experience entries)
           doc.setFont("helvetica", "bold");
-          doc.text(item.title, 20, yPosition);
+          doc.text(item.title || "", 20, yPosition);
           doc.setFont("helvetica", "normal");
           
           // Right-aligned date/location
@@ -75,11 +74,11 @@ export async function compileLatexToPDF(latexCode: string): Promise<Blob> {
           }
         } else if (item.type === "bullet") {
           // Handle bullet points
-          doc.text("• " + item.text, 25, yPosition);
+          doc.text("• " + (item.text || ""), 25, yPosition);
           yPosition += 5;
         } else {
           // Handle plain text
-          doc.text(item.text, 20, yPosition);
+          doc.text(item.text || "", 20, yPosition);
           yPosition += 5;
         }
         
@@ -101,8 +100,7 @@ export async function compileLatexToPDF(latexCode: string): Promise<Blob> {
 }
 
 /**
- * Improved LaTeX parser that handles tabular environments correctly
- * Specifically fixes the [t]l@r issue by properly parsing tabular environments
+ * LaTeX parser that specifically fixes the [t]l@r issue by properly parsing tabular environments
  */
 function parseLatexContent(latexCode: string): {
   name?: string;
@@ -154,7 +152,7 @@ function parseLatexContent(latexCode: string): {
       result.contact = contactText;
     }
     
-    // Extract sections using a more robust pattern
+    // Extract sections
     const sectionPattern = /\\section\{([^}]+)\}([\s\S]*?)(?=\\section\{|\\end\{document\})/g;
     let sectionMatch;
     
@@ -211,8 +209,7 @@ function parseLatexContent(latexCode: string): {
         });
       }
       
-      // If no content was found with the specific extractors,
-      // try a more general approach to get something useful
+      // If no content found with specific extractors, try general approach
       if (sectionData.content.length === 0) {
         // For sections like "Technical Skills" that have custom formatting
         const lines = sectionContent

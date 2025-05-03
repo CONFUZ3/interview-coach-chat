@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { UserCog, MessageSquare } from "lucide-react";
 import ResumeActions from "./ResumeActions";
+import { compileLatexToPDF, downloadLatexSource } from "@/services/latexService";
 
 export type MessageType = {
   id: string;
@@ -45,7 +46,41 @@ export default function ChatInterface({ mode, userProfile }: ChatInterfaceProps)
     document.body.removeChild(element);
   };
 
+  const handleDownloadPDF = async () => {
+    if (!profileData?.resumeText) {
+      return;
+    }
+
+    try {
+      // Use the improved LaTeX to PDF converter
+      const pdfBlob = await compileLatexToPDF(profileData.resumeText);
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `resume-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+    }
+  };
+
+  const handleDownloadLatex = () => {
+    if (!profileData?.resumeText) {
+      return;
+    }
+    
+    try {
+      downloadLatexSource(profileData.resumeText, `resume-${new Date().toISOString().slice(0, 10)}.tex`);
+    } catch (error) {
+      console.error("Error downloading LaTeX:", error);
+    }
+  };
+
   const hasResume = !!(profileData?.resumeText && profileData.resumeText.trim().length > 0);
+  const isLatex = !!(hasResume && profileData.resumeText.includes("\\documentclass"));
 
   if (isProfileLoading) {
     return (
@@ -84,8 +119,9 @@ export default function ChatInterface({ mode, userProfile }: ChatInterfaceProps)
         <div className="px-4 pt-3">
           <ResumeActions 
             hasResume={hasResume}
-            isLatex={false}
-            onDownloadPDF={() => {}}
+            isLatex={isLatex}
+            onDownloadPDF={handleDownloadPDF}
+            onDownloadLatex={handleDownloadLatex}
             onUploadResume={(resumeText) => {
               // This will be handled by the ResumeUpload component
             }}
