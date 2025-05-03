@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -24,7 +25,7 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Improved authentication handling
+  // Fetch session data
   const { data: sessionData, isLoading: isSessionLoading } = useQuery({
     queryKey: ['session'],
     queryFn: async () => {
@@ -75,7 +76,7 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
       return;
     }
     
-    if (sessionData?.session) {
+    if (!isSessionLoading && sessionData?.session) {
       const fetchProfile = async () => {
         setIsProfileLoading(true);
         try {
@@ -99,11 +100,11 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
       
       fetchProfile();
     }
-  }, [sessionData, toast, externalProfile]);
+  }, [sessionData, isSessionLoading, toast, externalProfile]);
 
   // Initialize conversation and load messages
   useEffect(() => {
-    if (!sessionData?.session || isProfileLoading) return;
+    if (isSessionLoading || !sessionData?.session || isProfileLoading) return;
     
     async function initConversationAndMessages() {
       try {
@@ -141,7 +142,7 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
     }
     
     initConversationAndMessages();
-  }, [sessionData, isProfileLoading, mode]);
+  }, [sessionData, isSessionLoading, isProfileLoading, mode]);
 
   // Helper function to create initial greeting
   const createInitialGreeting = async (convoId: string) => {
@@ -153,8 +154,8 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
     const initialMessage: MessageType = {
       id: generateId(),
       content: mode === "resume" 
-        ? `Hello${greetingName}! I'm your AI career coach powered by LangChain.${resumeStatus} I can help you with resume writing, career transitions, and professional development. How can I assist you today?`
-        : `Hello${greetingName}! I'm your AI interview coach powered by LangChain.${resumeStatus} I can help you prepare for interviews and provide feedback on your responses. Would you like to start a mock interview?`,
+        ? `Hello${greetingName}! I'm your AI career coach.${resumeStatus} I can help you with resume writing, career transitions, and professional development. How can I assist you today?`
+        : `Hello${greetingName}! I'm your AI interview coach.${resumeStatus} I can help you prepare for interviews and provide feedback on your responses. Would you like to start a mock interview?`,
       type: "ai",
       timestamp: new Date(),
       format: "text"

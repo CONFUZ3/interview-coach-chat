@@ -28,6 +28,9 @@ serve(async (req) => {
     
     // Enhanced resume processing
     let resumeContext = '';
+    let systemPrompt = `You are a helpful career coach AI assistant specializing in career advice, resume feedback, and job search strategies. 
+    Respond clearly and concisely, and provide actionable advice. When appropriate, reference specific details from the user's background.`;
+    
     if (profileData) {
       console.log("Profile data available:", {
         name: profileData.fullName,
@@ -37,17 +40,31 @@ serve(async (req) => {
       // If resume text is available, use it for context
       if (profileData.resumeText && profileData.resumeText.trim().length > 0) {
         console.log("Resume available, length:", profileData.resumeText.length);
+        
+        // Process resume text - truncate if necessary but still provide useful context
+        const resumeLength = profileData.resumeText.length;
+        const truncatedResume = resumeLength > 2000 
+          ? profileData.resumeText.substring(0, 2000) + "... [resume content truncated]"
+          : profileData.resumeText;
+          
         resumeContext = `
-        The user has uploaded a resume. Here are the key details:
+        USER RESUME:
         ---
-        ${profileData.resumeText.length > 1000 
-          ? profileData.resumeText.substring(0, 1000) + "... [resume content truncated for brevity]" 
-          : profileData.resumeText}
+        ${truncatedResume}
         ---
-        Please reference specific details from their resume when providing career advice or answering questions.`;
+        
+        When answering, refer to specific details from the user's resume when relevant. 
+        For example, mention their skills, experience, or education when providing advice.`;
+        
+        // Enhance system prompt with resume knowledge
+        systemPrompt += `\n\nThe user has shared their resume with you. Use the resume details to provide personalized advice. 
+        Refer to specific elements of their background when appropriate.`;
       } else {
         console.log("No resume uploaded by user");
-        resumeContext = 'The user has not uploaded a resume yet.';
+        resumeContext = 'Note: The user has not uploaded a resume yet.';
+        
+        // Modify system prompt to encourage resume sharing
+        systemPrompt += `\n\nThe user has not shared a resume yet. Where appropriate, you may suggest they upload a resume for more personalized advice.`;
       }
     } else {
       console.log("No profile data provided");
@@ -82,36 +99,32 @@ serve(async (req) => {
       verbose: true,
     });
 
+    // Get the last user message
     const lastMessage = messages[messages.length - 1];
     
-    // Always include profile context for better personalization
-    let contextAwareInput = lastMessage.content;
+    // Combine user query with context
+    let userInput = lastMessage.content;
     
-    // Add profile context if available with special emphasis on resume
-    if (profileData) {
-      // Create comprehensive user profile context
-      const profileContext = `
-      User Profile Information:
-      Name: ${profileData.fullName || 'not provided'}
-      Email: ${profileData.email || 'not provided'}
-      Phone: ${profileData.phone || 'not provided'}
-      ${resumeContext}
+    // For very first user message, add the resume context
+    if (resumeContext && messages.filter(m => m.type === 'user').length <= 1) {
+      userInput = `${resumeContext}\n\nUser query: ${lastMessage.content}`;
       
-      Based on this profile information, provide personalized career advice for the following query: ${lastMessage.content}
-      `;
-      
-      // For the first few messages, include the profile context explicitly
-      if (messages.length <= 3) {
-        contextAwareInput = profileContext;
-      } else {
-        // For later messages, just append a reminder about personalization
-        contextAwareInput = `Remember to reference specific details from ${profileData.fullName || 'the user'}'s resume when responding. Query: ${lastMessage.content}`;
-      }
+      // Add system message directly to the LLM call
+      llm.invocationParams.messages = [
+        {
+          role: "system",
+          content: systemPrompt
+        }
+      ];
+    } 
+    // For subsequent messages, add a reminder of context if available
+    else if (profileData?.resumeText) {
+      userInput = `Remember to reference my background when relevant. My query is: ${lastMessage.content}`;
     }
 
     console.log("Sending to LLM with context-aware input");
     const response = await chain.call({
-      input: contextAwareInput,
+      input: userInput,
     });
 
     console.log("Response received from LLM");
