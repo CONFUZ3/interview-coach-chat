@@ -1,8 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import type { MessageType } from "@/components/Chat/ChatInterface";
 
-export async function createConversation() {
+export async function createConversation(mode: "resume" | "interview" = "resume") {
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
@@ -19,7 +18,8 @@ export async function createConversation() {
     const { data, error } = await supabase
       .from('conversations')
       .insert({
-        user_id: sessionData.session.user.id
+        user_id: sessionData.session.user.id,
+        type: mode
       })
       .select()
       .single();
@@ -96,6 +96,51 @@ export async function getConversationMessages(conversationId: string): Promise<M
     }));
   } catch (error) {
     console.error("Failed to fetch conversation messages:", error);
+    throw error;
+  }
+}
+
+export async function getUserConversations(mode: "resume" | "interview" = "resume"): Promise<any[]> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.user) {
+      throw new Error("Authentication required");
+    }
+    
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('user_id', sessionData.session.user.id)
+      .eq('type', mode)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching conversations:", error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Failed to fetch conversations:", error);
+    return [];
+  }
+}
+
+export async function getOrCreateConversation(mode: "resume" | "interview" = "resume"): Promise<string> {
+  try {
+    // Try to get existing conversations
+    const conversations = await getUserConversations(mode);
+    
+    // If there's a recent conversation, use it
+    if (conversations && conversations.length > 0) {
+      return conversations[0].id;
+    }
+    
+    // Otherwise create a new conversation
+    const newConversation = await createConversation(mode);
+    return newConversation.id;
+  } catch (error) {
+    console.error("Failed to get or create conversation:", error);
     throw error;
   }
 }

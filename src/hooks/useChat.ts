@@ -5,7 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   createConversation, 
-  saveMessage 
+  saveMessage,
+  getConversationMessages,
+  getOrCreateConversation
 } from "@/services/conversationService";
 import { getUserProfile, ProfileData } from "@/services/profileService";
 import type { MessageType } from "@/components/Chat/ChatInterface";
@@ -18,6 +20,7 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(externalProfile || null);
   const [isProfileLoading, setIsProfileLoading] = useState(!externalProfile);
+  const [isMessagesLoading, setIsMessagesLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -49,6 +52,7 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
     };
   }, [navigate]);
 
+  // Check authentication
   useEffect(() => {
     if (isSessionLoading) return;
     
@@ -97,54 +101,74 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
     }
   }, [sessionData, toast, externalProfile]);
 
+  // Initialize conversation and load messages
   useEffect(() => {
-    if (sessionData?.session) {
-      async function initConversation() {
-        try {
-          console.log("Initializing conversation");
-          const conversation = await createConversation();
-          if (conversation && conversation.id) {
-            console.log("Conversation created with ID:", conversation.id);
-            setConversationId(conversation.id);
-          }
-        } catch (error) {
-          console.error("Failed to create conversation:", error);
-          toast({
-            title: "Error",
-            description: "Failed to initialize chat. Please try again.",
-            variant: "destructive",
-          });
-        }
-      }
-      
-      initConversation();
-    }
-  }, [sessionData, toast]);
-
-  useEffect(() => {
-    if (isProfileLoading || !conversationId) return;
+    if (!sessionData?.session || isProfileLoading) return;
     
-    const greetingName = profileData?.fullName ? `, ${profileData.fullName.split(' ')[0]}` : '';
+    async function initConversationAndMessages() {
+      try {
+        setIsMessagesLoading(true);
+        console.log("Getting or creating conversation");
+        
+        // Get existing conversation or create new one
+        const convoId = await getOrCreateConversation(mode);
+        setConversationId(convoId);
+        console.log("Using conversation ID:", convoId);
+        
+        // Load existing messages
+        const existingMessages = await getConversationMessages(convoId);
+        
+        if (existingMessages && existingMessages.length > 0) {
+          console.log("Loaded existing messages:", existingMessages.length);
+          setMessages(existingMessages);
+          setIsMessagesLoading(false);
+          return;
+        }
+        
+        // Otherwise, create initial greeting message
+        setIsMessagesLoading(false);
+        createInitialGreeting(convoId);
+        
+      } catch (error) {
+        console.error("Failed during conversation initialization:", error);
+        toast({
+          title: "Error",
+          description: "Failed to initialize chat. Please try again.",
+          variant: "destructive",
+        });
+        setIsMessagesLoading(false);
+      }
+    }
+    
+    initConversationAndMessages();
+  }, [sessionData, isProfileLoading, mode]);
+
+  // Helper function to create initial greeting
+  const createInitialGreeting = async (convoId: string) => {
+    if (!profileData) return;
+    
+    const greetingName = profileData.fullName ? `, ${profileData.fullName.split(' ')[0]}` : '';
+    const resumeStatus = profileData.resumeText ? " I see you've uploaded a resume, which I'll reference in my advice." : "";
     
     const initialMessage: MessageType = {
       id: generateId(),
       content: mode === "resume" 
-        ? `Hello${greetingName}! I'm your AI career coach powered by LangChain. I can help you with resume writing, career transitions, and professional development. How can I assist you today?`
-        : `Hello${greetingName}! I'm your AI interview coach powered by LangChain. I can help you prepare for interviews and provide feedback on your responses. Would you like to start a mock interview?`,
+        ? `Hello${greetingName}! I'm your AI career coach powered by LangChain.${resumeStatus} I can help you with resume writing, career transitions, and professional development. How can I assist you today?`
+        : `Hello${greetingName}! I'm your AI interview coach powered by LangChain.${resumeStatus} I can help you prepare for interviews and provide feedback on your responses. Would you like to start a mock interview?`,
       type: "ai",
       timestamp: new Date(),
-      category: "general"
+      format: "text"
     };
     
-    console.log("Setting initial message with greeting:", greetingName ? "personalized" : "generic");
+    console.log("Setting initial message with greeting");
     setMessages([initialMessage]);
     
-    if (conversationId) {
-      saveMessage(conversationId, initialMessage).catch(error => {
+    if (convoId) {
+      saveMessage(convoId, initialMessage).catch(error => {
         console.error("Failed to save initial message:", error);
       });
     }
-  }, [mode, conversationId, profileData, isProfileLoading]);
+  };
 
   const handleMessageSubmit = async (messageContent: string) => {
     if (!conversationId) {
@@ -161,7 +185,8 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
       id: generateId(),
       content: messageContent,
       type: "user",
-      timestamp: new Date()
+      timestamp: new Date(),
+      format: "text"
     };
     
     setMessages(prev => [...prev, userMessage]);
@@ -232,6 +257,7 @@ export function useChat(mode: "resume" | "interview", externalProfile?: ProfileD
     conversationId,
     profileData,
     isProfileLoading,
+    isMessagesLoading,
     handleMessageSubmit,
     copyToClipboard: (content: string) => {
       navigator.clipboard.writeText(content);

@@ -8,9 +8,10 @@ import { Spinner } from "@/components/ui/spinner";
 
 interface ResumeUploadProps {
   onUpload: (resumeText: string) => void;
+  isLoading?: boolean;
 }
 
-export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
+export default function ResumeUpload({ onUpload, isLoading = false }: ResumeUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
@@ -60,11 +61,11 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
         setUploadStatus(`Resume uploaded: ${file.name}`);
       } else if (file.type === 'application/pdf' || fileExt === 'pdf') {
         // For PDFs, we just capture the file info
-        onUpload(`Previous resume uploaded: ${file.name} (PDF)`);
+        onUpload(`Uploaded resume: ${file.name} (PDF format)`);
         setUploadStatus(`Resume uploaded: ${file.name}`);
       } else {
         // For DOC/DOCX files
-        onUpload(`Previous resume uploaded: ${file.name} (Word document)`);
+        onUpload(`Uploaded resume: ${file.name} (Word document format)`);
         setUploadStatus(`Resume uploaded: ${file.name}`);
       }
     } catch (error) {
@@ -75,6 +76,8 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
     }
   };
 
+  const isDisabled = isUploading || isLoading;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -84,23 +87,23 @@ export default function ResumeUpload({ onUpload }: ResumeUploadProps) {
           id="resume-upload"
           className="hidden"
           onChange={handleFileUpload}
-          disabled={isUploading}
+          disabled={isDisabled}
         />
         <Button
           variant="outline"
           className="w-full"
           onClick={() => document.getElementById("resume-upload")?.click()}
-          disabled={isUploading}
+          disabled={isDisabled}
         >
-          {isUploading ? (
+          {isUploading || isLoading ? (
             <>
               <Spinner className="mr-2 h-4 w-4" />
-              Uploading...
+              {isUploading ? "Uploading..." : "Saving..."}
             </>
           ) : (
             <>
               <Upload className="h-4 w-4 mr-2" />
-              Upload Previous Resume
+              Upload Resume
             </>
           )}
         </Button>

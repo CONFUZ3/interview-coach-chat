@@ -5,7 +5,8 @@ import { useChat } from "@/hooks/useChat";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { UserCog } from "lucide-react";
+import { UserCog, MessageSquare } from "lucide-react";
+import ResumeActions from "./ResumeActions";
 
 export type MessageType = {
   id: string;
@@ -19,7 +20,7 @@ export type MessageType = {
 
 interface ChatInterfaceProps {
   mode: "resume" | "interview";
-  userProfile?: any; // Add this prop to the interface
+  userProfile?: any;
 }
 
 export default function ChatInterface({ mode, userProfile }: ChatInterfaceProps) {
@@ -29,9 +30,10 @@ export default function ChatInterface({ mode, userProfile }: ChatInterfaceProps)
     conversationId,
     profileData,
     isProfileLoading,
+    isMessagesLoading,
     handleMessageSubmit,
     copyToClipboard,
-  } = useChat(mode);
+  } = useChat(mode, userProfile);
 
   const handleDownloadMessage = (content: string) => {
     const element = document.createElement("a");
@@ -42,6 +44,8 @@ export default function ChatInterface({ mode, userProfile }: ChatInterfaceProps)
     element.click();
     document.body.removeChild(element);
   };
+
+  const hasResume = !!(profileData?.resumeText && profileData.resumeText.trim().length > 0);
 
   if (isProfileLoading) {
     return (
@@ -76,11 +80,43 @@ export default function ChatInterface({ mode, userProfile }: ChatInterfaceProps)
 
   return (
     <div className="flex flex-col h-full">
-      <MessageList 
-        messages={messages} 
-        onCopyMessage={copyToClipboard}
-        onDownloadMessage={handleDownloadMessage}
-      />
+      {mode === "resume" && (
+        <div className="px-4 pt-3">
+          <ResumeActions 
+            hasResume={hasResume}
+            isLatex={false}
+            onDownloadPDF={() => {}}
+            onUploadResume={(resumeText) => {
+              // This will be handled by the ResumeUpload component
+            }}
+          />
+        </div>
+      )}
+      
+      {isMessagesLoading ? (
+        <div className="flex-1 flex justify-center items-center">
+          <div className="text-center">
+            <Spinner className="h-8 w-8 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Loading conversation...</p>
+          </div>
+        </div>
+      ) : messages.length === 0 ? (
+        <div className="flex-1 flex justify-center items-center p-4">
+          <div className="text-center max-w-md">
+            <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-20" />
+            <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Ask about career advice, resume feedback, or job interview preparation.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <MessageList 
+          messages={messages} 
+          onCopyMessage={copyToClipboard}
+          onDownloadMessage={handleDownloadMessage}
+        />
+      )}
       
       <div className="p-4 border-t">
         <ChatInputArea 

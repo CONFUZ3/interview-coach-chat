@@ -25,12 +25,15 @@ export async function generateResumeWithAI(jobDescription: string, previousResum
     console.log("Calling Supabase function with job description and profile data");
     console.log("Previous resume provided:", !!previousResume);
     
+    // Use the user's profile resume text if available and no specific resume is provided
+    const resumeToUse = previousResume || userProfile.resumeText || null;
+    
     // Pass the previousResume to the generate-resume function if available
     const { data, error } = await supabase.functions.invoke('generate-resume', {
       body: { 
         jobDescription, 
         userProfile, 
-        previousResume: previousResume || null
+        previousResume: resumeToUse
       },
     });
 

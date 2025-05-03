@@ -3,3 +3,6 @@ project_id = "fiqyafccamwqluunmara"
 
 [functions.career-chat]
 verify_jwt = true
+
+[functions.generate-resume]
+verify_jwt = true
