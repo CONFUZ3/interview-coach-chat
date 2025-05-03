@@ -26,14 +26,29 @@ serve(async (req) => {
 
     console.log("Processing chat request with conversation ID:", conversationId);
     
-    // Log profile data availability for debugging
+    // Enhanced resume processing
+    let resumeContext = '';
     if (profileData) {
       console.log("Profile data available:", {
         name: profileData.fullName,
-        email: profileData.email !== undefined,
-        phone: profileData.phone !== undefined,
         hasResume: profileData.resumeText !== undefined && profileData.resumeText !== ''
       });
+      
+      // If resume text is available, use it for context
+      if (profileData.resumeText && profileData.resumeText.trim().length > 0) {
+        console.log("Resume available, length:", profileData.resumeText.length);
+        resumeContext = `
+        The user has uploaded a resume. Here are the key details:
+        ---
+        ${profileData.resumeText.length > 1000 
+          ? profileData.resumeText.substring(0, 1000) + "... [resume content truncated for brevity]" 
+          : profileData.resumeText}
+        ---
+        Please reference specific details from their resume when providing career advice or answering questions.`;
+      } else {
+        console.log("No resume uploaded by user");
+        resumeContext = 'The user has not uploaded a resume yet.';
+      }
     } else {
       console.log("No profile data provided");
     }
@@ -74,22 +89,7 @@ serve(async (req) => {
     
     // Add profile context if available with special emphasis on resume
     if (profileData) {
-      let resumeContext = '';
-      
-      // If resume text is available, include a summary
-      if (profileData.resumeText && profileData.resumeText.trim().length > 0) {
-        resumeContext = `
-        The user has previously uploaded a resume with the following content:
-        ---
-        ${profileData.resumeText.length > 500 
-          ? profileData.resumeText.substring(0, 500) + "... [resume content truncated]" 
-          : profileData.resumeText}
-        ---
-        Please provide advice that takes into account their resume information.`;
-      } else {
-        resumeContext = 'No resume has been uploaded yet.';
-      }
-      
+      // Create comprehensive user profile context
       const profileContext = `
       User Profile Information:
       Name: ${profileData.fullName || 'not provided'}
@@ -105,7 +105,7 @@ serve(async (req) => {
         contextAwareInput = profileContext;
       } else {
         // For later messages, just append a reminder about personalization
-        contextAwareInput = `Remember to personalize your response for ${profileData.fullName || 'the user'} based on their profile and resume information. Query: ${lastMessage.content}`;
+        contextAwareInput = `Remember to reference specific details from ${profileData.fullName || 'the user'}'s resume when responding. Query: ${lastMessage.content}`;
       }
     }
 

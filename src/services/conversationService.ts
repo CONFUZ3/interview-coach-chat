@@ -1,5 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { MessageType } from "@/components/Chat/ChatInterface";
+import type { Database } from "@/integrations/supabase/types";
 
 export async function createConversation(mode: "resume" | "interview" = "resume") {
   try {
@@ -29,7 +31,7 @@ export async function createConversation(mode: "resume" | "interview" = "resume"
       throw error;
     }
     
-    console.log("Conversation created with ID:", data.id);
+    console.log("Conversation created with ID:", data?.id);
     return data;
   } catch (error) {
     console.error("Failed to create conversation:", error);
@@ -84,7 +86,11 @@ export async function getConversationMessages(conversationId: string): Promise<M
       throw error;
     }
     
-    console.log(`Retrieved ${data.length} messages`);
+    console.log(`Retrieved ${data?.length || 0} messages`);
+    
+    if (!data) {
+      return [];
+    }
     
     // Convert to MessageType format
     return data.map(msg => ({
@@ -138,6 +144,9 @@ export async function getOrCreateConversation(mode: "resume" | "interview" = "re
     
     // Otherwise create a new conversation
     const newConversation = await createConversation(mode);
+    if (!newConversation) {
+      throw new Error("Failed to create conversation");
+    }
     return newConversation.id;
   } catch (error) {
     console.error("Failed to get or create conversation:", error);

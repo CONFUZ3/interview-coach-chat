@@ -101,12 +101,14 @@ export async function saveResume(resumeContent: string, jobTitle?: string, compa
       return false;
     }
     
-    const { error } = await supabase.from('resumes').insert({
-      user_id: sessionData.session.user.id,
-      content: resumeContent,
-      job_title: jobTitle || null,
-      company: company || null
-    });
+    const { error } = await supabase
+      .from('resumes')
+      .insert({
+        user_id: sessionData.session.user.id,
+        content: resumeContent,
+        job_title: jobTitle || null,
+        company: company || null
+      });
     
     if (error) {
       console.error("Error saving resume:", error);
@@ -138,7 +140,7 @@ export async function getUserResumes(): Promise<any[] | null> {
       return null;
     }
     
-    return data;
+    return data || [];
   } catch (error) {
     console.error("Failed to fetch resume data:", error);
     return null;
